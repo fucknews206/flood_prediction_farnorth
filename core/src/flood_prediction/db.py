@@ -47,6 +47,7 @@ from .models import (
     UserAccount,
     VerifiedFloodEvent,
     UserSetting,
+    FloodAssessment,
 )
 from .settings import settings
 
@@ -145,6 +146,8 @@ def _apply_phase3_migration(engine) -> None:
         "ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS username VARCHAR(100)",
         "ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS email VARCHAR(254)",
         "ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)",
+        "ALTER TABLE user_predictions ALTER COLUMN confidence_score DROP NOT NULL",
+        "ALTER TABLE user_predictions ADD COLUMN IF NOT EXISTS assessment_id INTEGER",
     )
     with engine.begin() as conn:
         for statement in statements:
@@ -174,6 +177,49 @@ def _apply_sqlite_migration(engine) -> None:
         for name, definition in account_additions.items():
             if name not in account_columns:
                 conn.execute(text(f"ALTER TABLE user_accounts ADD COLUMN {name} {definition}"))
+    prediction_columns = {
+        row[1]: row for row in engine.connect().execute(text("PRAGMA table_info(user_predictions)"))
+    }
+    if "assessment_id" not in prediction_columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE user_predictions ADD COLUMN assessment_id INTEGER"))
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_predictions_assessment ON user_predictions (assessment_id) WHERE assessment_id IS NOT NULL"))
+        prediction_columns = {
+            row[1]: row for row in engine.connect().execute(text("PRAGMA table_info(user_predictions)"))
+        }
+    # SQLite cannot drop a NOT NULL constraint in place.  Rebuild only this
+    # small audit table, preserving every existing record, so partial-data
+    # scores can be stored with a truthful null confidence value.
+    confidence_column = prediction_columns.get("confidence_score")
+    if confidence_column and confidence_column[3]:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE user_predictions__confidence_nullable (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id VARCHAR(100) NOT NULL,
+                    locality VARCHAR(100) NOT NULL,
+                    risk_level VARCHAR(30) NOT NULL,
+                    estimated_risk_percent FLOAT NOT NULL,
+                    confidence_score FLOAT,
+                    assessment_id INTEGER,
+                    forecast_period VARCHAR(50),
+                    details TEXT,
+                    created_at DATETIME
+                )
+            """))
+            conn.execute(text("""
+                INSERT INTO user_predictions__confidence_nullable
+                    (id, user_id, locality, risk_level, estimated_risk_percent,
+                     confidence_score, assessment_id, forecast_period, details, created_at)
+                SELECT id, user_id, locality, risk_level, estimated_risk_percent,
+                       confidence_score, assessment_id, forecast_period, details, created_at
+                FROM user_predictions
+            """))
+            conn.execute(text("DROP TABLE user_predictions"))
+            conn.execute(text("ALTER TABLE user_predictions__confidence_nullable RENAME TO user_predictions"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_user_predictions_user_time ON user_predictions (user_id, created_at)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_user_predictions_user_id ON user_predictions (user_id)"))
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_predictions_assessment ON user_predictions (assessment_id) WHERE assessment_id IS NOT NULL"))
 
 
 # ---------------------------------------------------------------------------
@@ -843,6 +889,28 @@ def local_account_exists(identifier: str) -> bool:
         return session.scalar(select(UserAccount.user_id).where(or_(UserAccount.user_id == clean, UserAccount.username == clean, UserAccount.email == clean))) is not None
 
 
+def register_local_citizen(display_name: str, email: str, password: str) -> Dict[str, Any]:
+    """Create one real local citizen account; never fabricate a browser-only user."""
+    clean_email = str(email).strip().lower()
+    if not clean_email or not password:
+        raise ValueError("Email and password are required")
+    with get_session() as session:
+        exists = session.scalar(select(UserAccount.user_id).where(or_(
+            UserAccount.user_id == clean_email, UserAccount.username == clean_email, UserAccount.email == clean_email,
+        )))
+        if exists:
+            raise ValueError("An account already exists for this email")
+        account = UserAccount(
+            user_id=clean_email, username=clean_email, email=clean_email,
+            display_name=str(display_name).strip() or clean_email,
+            role="Citizen User", is_active=True, password_hash=_hash_local_password(password),
+        )
+        session.add(account)
+        session.flush()
+        return {"user_id": account.user_id, "username": account.username, "email": account.email,
+                "name": account.display_name, "role": "citizen"}
+
+
 def update_user_account(
     user_id: str,
     display_name: Optional[str] = None,
@@ -1337,15 +1405,28 @@ def save_user_prediction(user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         risk_level_value = data.get("risk_level")
         risk_pct_value = data.get("estimated_risk_percent") if data.get("estimated_risk_percent") is not None else data.get("risk_percent")
         confidence_value = data.get("confidence_score") if data.get("confidence_score") is not None else data.get("confidence")
-        if not locality or locality == "Unknown" or risk_level_value is None or risk_pct_value is None or confidence_value is None:
+        if not locality or locality == "Unknown" or risk_level_value is None or risk_pct_value is None:
             raise ValueError("Cannot persist an incomplete authoritative prediction")
         risk_level = str(risk_level_value)
         risk_pct = float(risk_pct_value)
-        confidence = float(confidence_value)
+        confidence = float(confidence_value) if confidence_value is not None else None
         forecast_period = str(data.get("forecast_period") or "Next 24–72 hrs")
-        details_json = json.dumps(data.get("details") or data)
+        details = data.get("details") or data
+        details_json = json.dumps(details)
+        risk_snapshot = details.get("risk") if isinstance(details, dict) else None
+        coordinates = risk_snapshot.get("coordinates") if isinstance(risk_snapshot, dict) else None
+        assessment = FloodAssessment(
+            user_id=str(user_id), locality=locality,
+            region=str(details.get("region")) if isinstance(details, dict) and details.get("region") else None,
+            coordinates=json.dumps(coordinates) if coordinates is not None else None,
+            status="completed", snapshot=details_json,
+            model_version=(str(risk_snapshot.get("model_version")) if isinstance(risk_snapshot, dict) and risk_snapshot.get("model_version") else None),
+        )
+        session.add(assessment)
+        session.flush()
 
         record = UserPrediction(
+            assessment_id=assessment.id,
             user_id=str(user_id),
             locality=locality,
             risk_level=risk_level,
@@ -1357,6 +1438,23 @@ def save_user_prediction(user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         session.add(record)
         session.flush()
         return record.to_dict()
+
+
+def get_user_assessment(user_id: str, assessment_id: int) -> Optional[Dict[str, Any]]:
+    """Return one assessment only when it belongs to the authenticated user."""
+    with get_session() as session:
+        row = session.scalar(select(FloodAssessment).where(
+            FloodAssessment.id == int(assessment_id), FloodAssessment.user_id == str(user_id)
+        ))
+        return row.to_dict() if row else None
+
+
+def get_user_prediction_for_assessment(user_id: str, assessment_id: int) -> Optional[Dict[str, Any]]:
+    with get_session() as session:
+        row = session.scalar(select(UserPrediction).where(
+            UserPrediction.assessment_id == int(assessment_id), UserPrediction.user_id == str(user_id)
+        ))
+        return row.to_dict() if row else None
 
 
 def get_user_latest_prediction(user_id: str) -> Optional[Dict[str, Any]]:

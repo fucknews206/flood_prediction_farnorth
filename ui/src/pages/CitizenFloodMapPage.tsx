@@ -13,6 +13,7 @@ import {
 import CitizenSidebar from '@/components/CitizenSidebar'
 import GlobalWatershedMap from '@/components/GlobalWatershedMap'
 import { dashboardApi, userPredictionsApi, type DashboardData, type Watershed } from '@/lib/api'
+import { getSession } from '@/lib/session'
 
 export default function CitizenFloodMapPage() {
   const navigate = useNavigate()
@@ -24,16 +25,7 @@ export default function CitizenFloodMapPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // 1. Initial user from localStorage
-    const stored = localStorage.getItem('aquaguard_user')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        setUser(parsed)
-      } catch {
-        // ignore
-      }
-    }
+    setUser(getSession())
 
     // 2. Fetch authenticated profile
     userPredictionsApi

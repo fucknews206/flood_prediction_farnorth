@@ -21,10 +21,11 @@ import FeedbackPage from '@/pages/FeedbackPage'
 import AdminSubmissionsPage from '@/pages/AdminSubmissionsPage'
 import SafetyPage from '@/pages/SafetyPage'
 import AdminDashboardPage from '@/dashboard/page'
+import { getSession, isCitizen } from '@/lib/session'
 
 function RoleGate({ role, children }: { role: 'admin' | 'citizen'; children: ReactNode }) {
   try {
-    const user = JSON.parse(localStorage.getItem('aquaguard_user') || 'null')
+    const user = getSession()
     if (!user || user.role !== role) return <Navigate to="/login" replace />
   } catch {
     return <Navigate to="/login" replace />
@@ -34,13 +35,10 @@ function RoleGate({ role, children }: { role: 'admin' | 'citizen'; children: Rea
 
 function CitizenGate({ children }: { children: ReactNode }) {
   try {
-    const raw = localStorage.getItem('aquaguard_user')
-    if (!raw) return <Navigate to="/login" replace />
-    const user = JSON.parse(raw)
-    if (!user || (!user.name && !user.username && !user.email)) {
+    const user = getSession()
+    if (!isCitizen(user)) {
       return <Navigate to="/login" replace />
     }
-    if (user.role === 'admin' || user.role === 'administrator') return <Navigate to="/admin-dashboard" replace />
   } catch {
     return <Navigate to="/login" replace />
   }

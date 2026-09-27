@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     AlertTriangle,
-    RefreshCw,
     Activity,
     Droplets,
-    Globe
+    Globe,
+    ChevronDown,
+    ShieldCheck,
 } from 'lucide-react'
 import { dashboardApi, type DashboardData, type Watershed } from '@/lib/api'
 import GlobalWatershedMap from '@/components/GlobalWatershedMap'
@@ -15,7 +16,7 @@ export default function PublicFloodMapPage() {
     const [lang, setLang] = useState<'English' | 'Français'>('English')
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
     const [selectedWatershed, setSelectedWatershed] = useState<Watershed | null>(null)
-    const [isLoading, setIsLoading] = useState(true)
+    const [, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
     const fetchData = async () => {
@@ -40,62 +41,53 @@ export default function PublicFloodMapPage() {
     const watersheds = dashboardData?.watersheds || []
 
     return (
-        <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col">
+        <div className="min-h-screen bg-gradient-to-b from-[#f5f8fd] via-slate-50 to-white font-sans text-slate-900 flex flex-col">
             {/* Public Header matching Landing Page */}
-            <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-xs">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+            <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     {/* Logo */}
                     <div
                         className="flex items-center gap-2.5 cursor-pointer select-none"
                         onClick={() => navigate('/')}
                     >
-                        <div className="w-8 h-8 rounded-lg bg-[#0f2460] flex items-center justify-center shadow">
-                            <Droplets className="w-4 h-4 text-white" />
+                        <div className="w-8 h-8 rounded-lg bg-[#0f2460] flex items-center justify-center text-white shadow-sm">
+                            <ShieldCheck className="w-4 h-4" />
                         </div>
                         <div className="leading-tight">
                             <p className="font-bold text-slate-900 text-sm tracking-tight">AquaGuard AI</p>
-                            <p className="text-[10px] text-slate-500 -mt-0.5">Cameroon Flood Intel</p>
+                            <p className="text-[10px] text-slate-500 font-medium">Cameroon Flood Intelligence</p>
                         </div>
                     </div>
 
-                    {/* Center nav pills */}
-                    <nav className="hidden md:flex items-center gap-1 bg-slate-100 px-1 py-1 rounded-full text-sm font-medium">
+                    {/* Same navigation language as the public landing page. */}
+                    <nav className="hidden md:flex items-center gap-8 text-xs font-semibold text-slate-600">
                         <button
                             onClick={() => navigate('/')}
-                            className="px-4 py-1 rounded-full text-slate-500 hover:text-slate-800 text-xs transition-colors cursor-pointer"
+                            className="hover:text-slate-900 transition-colors cursor-pointer"
                         >
                             Platform Overview
                         </button>
                         <button
                             onClick={() => navigate('/#methodology')}
-                            className="px-4 py-1 rounded-full text-slate-500 hover:text-slate-800 text-xs transition-colors cursor-pointer"
+                            className="hover:text-slate-900 transition-colors cursor-pointer"
                         >
                             Methodology
                         </button>
                         <button
                             onClick={() => setLang(lang === 'English' ? 'Français' : 'English')}
-                            className="flex items-center gap-1 px-3 py-1 rounded-full text-slate-500 hover:text-slate-800 text-xs transition-colors border-l border-slate-300 ml-1 pl-3 cursor-pointer"
+                            className="flex items-center gap-1 text-slate-600 hover:text-slate-900 text-xs font-medium cursor-pointer transition-colors"
                         >
-                            <Globe className="w-3 h-3" />
+                            <Globe className="w-3.5 h-3.5 text-slate-500" />
                             {lang}
+                            <ChevronDown className="w-3 h-3 text-slate-400" />
                         </button>
                     </nav>
 
                     {/* Right actions */}
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={fetchData}
-                            disabled={isLoading}
-                            className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-xs transition-colors cursor-pointer"
-                            title="Refresh map data"
-                        >
-                            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
-                            <span>Refresh</span>
-                        </button>
-
-                        <button
                             onClick={() => navigate('/login')}
-                            className="bg-[#0f2460] hover:bg-[#0a1c4e] text-white text-xs font-semibold px-4 py-2 rounded-full shadow transition-all cursor-pointer"
+                            className="bg-[#0f2460] hover:bg-[#0a1c4e] text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm transition-all cursor-pointer"
                         >
                             Access Portal
                         </button>

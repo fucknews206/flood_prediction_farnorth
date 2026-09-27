@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
+import { clearSession } from '@/lib/session'
 import {
   LayoutDashboard,
   TrendingUp,
@@ -36,7 +37,7 @@ export default function CitizenSidebar({ isOpen = false, onClose }: CitizenSideb
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('aquaguard_user')
+    clearSession()
     navigate('/login')
   }
 

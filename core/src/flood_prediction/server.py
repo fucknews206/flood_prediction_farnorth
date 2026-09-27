@@ -707,6 +707,12 @@ class LocalLoginRequest(BaseModel):
     password: str
 
 
+class LocalRegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
 class LogEntry(BaseModel):
     """Frontend log entry"""
     timestamp: str
@@ -924,6 +930,16 @@ async def local_login(payload: LocalLoginRequest):
     if account is None:
         known = await asyncio.to_thread(db.local_account_exists, payload.identifier)
         return JSONResponse({"detail": "Invalid username/email or password"}, status_code=401 if known else 404)
+    return {"user": account}
+
+
+@app.post(_api("auth/local-register"))
+async def local_register(payload: LocalRegisterRequest):
+    """Create a locally managed citizen account for the local-auth profile."""
+    try:
+        account = await asyncio.to_thread(db.register_local_citizen, payload.name, payload.email, payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"user": account}
 
 
@@ -2173,6 +2189,17 @@ async def get_my_predictions(user_id: UserID, limit: int = 50):
     return {"predictions": predictions, "count": len(predictions)}
 
 
+@app.get(_api("my-assessments/{assessment_id}"))
+async def get_my_assessment(assessment_id: int, user_id: UserID):
+    """Fetch one immutable snapshot, enforcing authenticated ownership."""
+    clean_id = _require_authenticated_identity(user_id)
+    assessment = db.get_user_assessment(clean_id, assessment_id)
+    prediction = db.get_user_prediction_for_assessment(clean_id, assessment_id)
+    if assessment is None or prediction is None:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    return {"assessment": assessment, "prediction": prediction}
+
+
 @app.post(_api("my-predictions"))
 async def save_my_prediction(user_id: UserID, req: SavePredictionRequest):
     """Save a real prediction associated with the authenticated user."""
@@ -2185,7 +2212,7 @@ async def save_my_prediction(user_id: UserID, req: SavePredictionRequest):
     # Recalculate whenever the client did not provide the complete result.
     # Never manufacture a probability or confidence value merely to make a
     # record fit the UI; an unavailable engine result must remain unavailable.
-    if req.risk_level is None or req.estimated_risk_percent is None or req.confidence_score is None:
+    if req.risk_level is None or req.estimated_risk_percent is None:
         if _get_farnorth_risk is not None:
             try:
                 calc = await asyncio.to_thread(_get_farnorth_risk, locality)
@@ -2197,7 +2224,7 @@ async def save_my_prediction(user_id: UserID, req: SavePredictionRequest):
     risk_level = req.risk_level or risk_data.get("risk_level")
     estimated_risk_percent = req.estimated_risk_percent if req.estimated_risk_percent is not None else risk_data.get("estimated_risk_percent")
     confidence_score = req.confidence_score if req.confidence_score is not None else risk_data.get("confidence_score")
-    if risk_level is None or estimated_risk_percent is None or confidence_score is None:
+    if risk_level is None or estimated_risk_percent is None:
         raise HTTPException(status_code=503, detail="The authoritative Far North prediction is unavailable; nothing was saved")
     details = req.details or risk_data
 
@@ -2207,12 +2234,13 @@ async def save_my_prediction(user_id: UserID, req: SavePredictionRequest):
             "locality": locality,
             "risk_level": risk_level,
             "estimated_risk_percent": float(estimated_risk_percent),
-            "confidence_score": float(confidence_score),
+            "confidence_score": float(confidence_score) if confidence_score is not None else None,
             "forecast_period": req.forecast_period or "Next 24–72 hrs",
             "details": details,
         }
     )
-    return {"status": "saved", "prediction": saved}
+    log.info("[Assessment] user=%s assessment=%s prediction=%s locality=%s", user_id, saved.get("assessment_id"), saved.get("id"), locality)
+    return {"status": "completed", "assessment_id": saved.get("assessment_id"), "prediction_id": saved.get("id"), "prediction": saved}
 
 
 # =============================================================================

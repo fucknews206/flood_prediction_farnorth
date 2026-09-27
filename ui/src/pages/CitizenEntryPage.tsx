@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   MapPin,
   Maximize2,
@@ -19,11 +19,11 @@ import {
 import CitizenSidebar from '@/components/CitizenSidebar'
 import {
   userPredictionsApi,
-  farNorthRiskApi,
   telemetryApi,
   type UserPredictionRecord,
   type TelemetrySource
 } from '@/lib/api'
+import { getSession } from '@/lib/session'
 
 // Available Far North localities
 const FAR_NORTH_LOCALITIES = [
@@ -44,6 +44,7 @@ const FAR_NORTH_LOCALITIES = [
 
 export default function CitizenEntryPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Authenticated user state
@@ -56,10 +57,10 @@ export default function CitizenEntryPage() {
   const [selectedLocality, setSelectedLocality] = useState<string | null>(null)
   const [latestPrediction, setLatestPrediction] = useState<UserPredictionRecord | null>(null)
   const [predictionLoading, setPredictionLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // 7-day forecast state
   const [forecastTrajectory, setForecastTrajectory] = useState<any[]>([])
-  const [, setForecastLoading] = useState(false)
   const [activeTrajectoryTab, setActiveTrajectoryTab] = useState<'7days' | 'historical'>('7days')
 
   // Modals & UI states
@@ -72,16 +73,7 @@ export default function CitizenEntryPage() {
   const [telemetryLoading, setTelemetryLoading] = useState(false)
 
   useEffect(() => {
-    // 1. Initial user from localStorage
-    const stored = localStorage.getItem('aquaguard_user')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        setUser(parsed)
-      } catch {
-        // ignore
-      }
-    }
+    setUser(getSession())
 
     // 2. Fetch authenticated profile
     userPredictionsApi.getMe().then((profile) => {
@@ -91,11 +83,11 @@ export default function CitizenEntryPage() {
     }).catch(() => {})
 
     // 3. Load latest prediction
-    loadDashboardData()
+    loadDashboardData(searchParams.get('assessment'))
 
     // 4. Fetch real-time telemetry status
     fetchTelemetryStatus()
-  }, [])
+  }, [searchParams])
 
   const fetchTelemetryStatus = async () => {
     setTelemetryLoading(true)
@@ -111,47 +103,39 @@ export default function CitizenEntryPage() {
     }
   }
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (assessmentId?: string | null) => {
     setPredictionLoading(true)
     setIsRefreshing(true)
+    setLoadError(null)
     try {
-      const res = await userPredictionsApi.getLatest()
-      const pred = res?.prediction
+      const explicitId = assessmentId ? Number(assessmentId) : null
+      const pred = explicitId && Number.isFinite(explicitId)
+        ? (await userPredictionsApi.getAssessment(explicitId)).prediction
+        : (await userPredictionsApi.getLatest())?.prediction
 
       if (pred && pred.locality) {
-        // We have a verified prediction
+        // Render the forecast snapshot captured with this exact assessment;
+        // querying today's forecast here would mix time periods/results.
+        console.log(`[Dashboard] user=${getSession()?.user_id || getSession()?.username || 'unknown'} loading assessment=${pred.assessment_id ?? explicitId ?? 'latest'} locality=${pred.locality}`)
         setLatestPrediction(pred)
         setSelectedLocality(pred.locality)
-        await loadForecast(pred.locality)
+        const savedTrajectory = pred.details?.forecast?.trajectory
+        setForecastTrajectory(Array.isArray(savedTrajectory) ? savedTrajectory : [])
       } else {
         // State A: No locality selected
         setLatestPrediction(null)
         setSelectedLocality(null)
         setForecastTrajectory([])
       }
-    } catch {
+    } catch (err) {
+      // Never fall back to an old prediction on failure — show an explicit error.
       setLatestPrediction(null)
       setSelectedLocality(null)
       setForecastTrajectory([])
+      setLoadError(err instanceof Error ? err.message : 'Unable to load your assessment. Please try again.')
     } finally {
       setPredictionLoading(false)
       setIsRefreshing(false)
-    }
-  }
-
-  const loadForecast = async (locality: string) => {
-    setForecastLoading(true)
-    try {
-      const data = await farNorthRiskApi.forecast(locality)
-      if (data && Array.isArray(data.trajectory) && data.trajectory.length > 0) {
-        setForecastTrajectory(data.trajectory)
-      } else {
-        setForecastTrajectory([])
-      }
-    } catch {
-      setForecastTrajectory([])
-    } finally {
-      setForecastLoading(false)
     }
   }
 
@@ -162,11 +146,12 @@ export default function CitizenEntryPage() {
     // Check if current prediction matches this locality
     if (latestPrediction && latestPrediction.locality === locality) {
       // State C
-      await loadForecast(locality)
+      const savedTrajectory = latestPrediction.details?.forecast?.trajectory
+      setForecastTrajectory(Array.isArray(savedTrajectory) ? savedTrajectory : [])
     } else {
       // State B: Location selected, but no prediction run yet for it
       setLatestPrediction(null)
-      await loadForecast(locality)
+      setForecastTrajectory([])
     }
   }
 
@@ -177,8 +162,8 @@ export default function CitizenEntryPage() {
     setLocationModalOpen(false)
   }
 
-  // Display user properties
-  const displayName = user?.name || user?.username || 'jeanongoubolo'
+  // Display user properties — never fall back to a hardcoded identity.
+  const displayName = user?.name || user?.username || 'Citizen'
   const userGreetingName = displayName.includes('@') ? displayName.split('@')[0] : displayName
 
   // Dynamic greeting time
@@ -193,16 +178,9 @@ export default function CitizenEntryPage() {
   const isModerateRisk = latestPrediction?.risk_level?.toLowerCase().includes('mod')
   const riskColor = isHighRisk ? '#EF4444' : isModerateRisk ? '#F59E0B' : '#10B981'
 
-  // Default trajectory for the dashboard chart when no real data loaded yet
-  const DEFAULT_TRAJECTORY = (() => {
-    const today = new Date()
-    return [0.246, 0.251, 0.315, 0.338, 0.276, 0.248, 0.235].map((prob, i) => {
-      const d = new Date(today); d.setDate(d.getDate() + i)
-      return { date: d.toISOString().split('T')[0], classifier_probability: prob, option_b_threshold_flag: i === 2 || i === 3 }
-    })
-  })()
-
-  const chartTrajectory = forecastTrajectory.length > 0 ? forecastTrajectory : DEFAULT_TRAJECTORY
+  // A missing forecast remains visibly empty.  Never draw a reference curve
+  // that could be mistaken for this assessment's forecast.
+  const chartTrajectory = forecastTrajectory
 
   // Trajectory SVG coordinates computation (probability-based)
   const chartW = 560, chartH = 80, padX = 20
@@ -221,7 +199,7 @@ export default function CitizenEntryPage() {
     const cx = (prev.x + pt.x) / 2
     return `${acc} C ${cx},${prev.y} ${cx},${pt.y} ${pt.x},${pt.y}`
   }, '')
-  const areaD = pathD + ` L ${trajectoryPoints[trajectoryPoints.length-1].x},${chartH} L ${trajectoryPoints[0].x},${chartH} Z`
+  const areaD = trajectoryPoints.length ? pathD + ` L ${trajectoryPoints[trajectoryPoints.length-1].x},${chartH} L ${trajectoryPoints[0].x},${chartH} Z` : ''
 
   return (
     <div className="flex min-h-screen w-full bg-[#060B13] font-sans text-slate-100 selection:bg-blue-600 selection:text-white">
@@ -244,7 +222,7 @@ export default function CitizenEntryPage() {
           {/* Right Controls: Refresh, Bell, User Profile */}
           <div className="flex items-center gap-4">
             <button
-              onClick={loadDashboardData}
+              onClick={() => loadDashboardData(searchParams.get('assessment'))}
               className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800/60 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
               title="Refresh Dashboard Data"
               aria-label="Refresh Dashboard Data"
@@ -287,7 +265,7 @@ export default function CitizenEntryPage() {
 
             {/* Issue #2 Canonical CTA: + Assess flood risk */}
             <button
-              onClick={() => navigate('/assess-flood-risk')}
+              onClick={() => navigate('/assess-flood-risk?new=1')}
               className="bg-[#1D68F7] hover:bg-blue-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-blue-600/20 flex items-center gap-1.5 transition-all self-start sm:self-auto cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
             >
               <Plus className="w-4 h-4" />
@@ -319,6 +297,13 @@ export default function CitizenEntryPage() {
               {hasLocality ? 'Change location' : 'Choose location'}
             </button>
           </div>
+
+          {/* Explicit load error — never silently fall back to stale data */}
+          {loadError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700" role="alert">
+              {loadError}
+            </div>
+          )}
 
           {/* Middle 2-Column Section: Left Assessment Card + Right Map Card */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -372,7 +357,7 @@ export default function CitizenEntryPage() {
                     <div className="pt-4">
                       {/* Issue #2: canonical action [Assess flood risk] */}
                       <button
-                        onClick={() => navigate('/assess-flood-risk')}
+                        onClick={() => navigate('/assess-flood-risk?new=1')}
                         className="bg-[#1D68F7] hover:bg-blue-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-blue-600/20 flex items-center gap-2 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -662,7 +647,7 @@ export default function CitizenEntryPage() {
               </div>
               {forecastTrajectory.length === 0 && (
                 <p className="text-[10px] text-slate-500 text-center pt-1">
-                  Showing reference baseline · <button onClick={() => navigate('/assess-flood-risk')} className="text-[#1D68F7] hover:text-blue-400 underline">Assess a locality</button> to see real data
+                  No forecast is stored for this assessment. <button onClick={() => navigate('/assess-flood-risk?new=1')} className="text-[#1D68F7] hover:text-blue-400 underline">Start a new assessment</button> to fetch live data.
                 </p>
               )}
             </div>

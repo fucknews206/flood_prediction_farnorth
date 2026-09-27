@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, ShieldCheck, Globe, Cpu, Bell, ChevronRight, Home } from 'lucide-react'
+import { setSession } from '@/lib/session'
 
 type ActiveTab = 'signin' | 'register'
 
@@ -122,19 +123,12 @@ function SignInForm() {
             const response = await fetch('/api/auth/local-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier, password }) })
             if (response.ok) {
                 const payload = await response.json()
-                localStorage.setItem('aquaguard_user', JSON.stringify(payload.user))
+                setSession(payload.user)
                 setLoading(false)
                 navigate(payload.user.role === 'admin' ? '/admin-dashboard' : '/citizen-entry')
                 return
             }
-            // Preserve the demo's public citizen sign-in for identities that
-            // have no admin-managed local account yet.  Once an account is
-            // saved by an admin, bad credentials are rejected by the API.
-            if (response.status !== 404) throw new Error('Invalid username/email or password')
-            const isAdmin = (identifier.toLowerCase() === 'admin' || identifier.toLowerCase() === 'admin@aquaguard.local') && password === 'admin123'
-            localStorage.setItem('aquaguard_user', JSON.stringify({ name: isAdmin ? 'Administrator' : identifier, username: identifier, role: isAdmin ? 'admin' : 'citizen' }))
-            setLoading(false)
-            navigate(isAdmin ? '/admin-dashboard' : '/citizen-entry')
+            throw new Error('Invalid username/email or password')
         } catch (error) {
             setError(error instanceof Error ? error.message : 'Unable to sign in right now.')
             setLoading(false)
@@ -244,22 +238,29 @@ function RegisterForm() {
         fullName: '', email: '', phone: '', region: 'Littoral', password: '', confirmPassword: '',
     })
     const [loading, setLoading] = useState(false)
+    const [error, setError] = useState('')
 
     const regions = ['Littoral', 'Centre', 'Far North', 'North', 'Adamaoua', 'West', 'South West', 'North West', 'East', 'South']
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (form.password !== form.confirmPassword) { alert('Passwords do not match!'); return }
+        setError('')
+        if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return }
         setLoading(true)
-        setTimeout(() => {
-            localStorage.setItem('aquaguard_user', JSON.stringify({
-                name: form.fullName.trim() || form.email.trim(),
-                username: form.email.trim(),
-                role: 'citizen',
-            }))
+        try {
+            const response = await fetch('/api/auth/local-register', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: form.fullName.trim(), email: form.email.trim(), password: form.password }),
+            })
+            const payload = await response.json()
+            if (!response.ok) throw new Error(payload.detail || 'Unable to create your account.')
+            setSession(payload.user)
             setLoading(false)
             navigate('/citizen-entry')
-        }, 700)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unable to create your account.')
+            setLoading(false)
+        }
     }
 
     const field = (label: string, key: keyof typeof form, type = 'text', placeholder = '') => (
@@ -280,8 +281,10 @@ function RegisterForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
                 <h2 className="text-xl font-bold text-gray-900">Create Account</h2>
-                <p className="text-gray-500 text-sm mt-1">Register to receive flood alerts and access the portal.</p>
+            <p className="text-gray-500 text-sm mt-1">Register to receive flood alerts and access the portal.</p>
             </div>
+
+            {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
 
             {field('Full Name', 'fullName', 'text', 'Jean-Paul Nkoumou')}
 

@@ -498,16 +498,56 @@ class Cache(Base):
                          default=lambda: datetime.now(timezone.utc))
 
 
+class FloodAssessment(Base):
+    """Immutable completed-assessment snapshot owned by one citizen.
+
+    Anonymous visitors never create this record.  A prediction points to this
+    snapshot so the dashboard can never combine location/factors from one run
+    with the score from another.
+    """
+    __tablename__ = "flood_assessments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(100), nullable=False, index=True)
+    locality = Column(String(100), nullable=False)
+    region = Column(String(100), nullable=True)
+    coordinates = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False, default="completed")
+    snapshot = Column(Text, nullable=False)
+    model_version = Column(String(120), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        Index("idx_flood_assessments_user_completed", "user_id", "completed_at"),
+    )
+
+    def to_dict(self):
+        return {
+            "assessment_id": self.id, "user_id": self.user_id,
+            "locality": self.locality, "region": self.region,
+            "coordinates": json.loads(self.coordinates) if self.coordinates else None,
+            "status": self.status,
+            "snapshot": json.loads(self.snapshot) if self.snapshot else {},
+            "model_version": self.model_version,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+        }
+
+
 class UserPrediction(Base):
     """Authenticated user's historical and latest flood risk predictions."""
     __tablename__ = "user_predictions"
 
     id                     = Column(Integer, primary_key=True, autoincrement=True)
+    assessment_id          = Column(Integer, ForeignKey("flood_assessments.id"), nullable=True, unique=True)
     user_id                = Column(String(100), nullable=False)
     locality               = Column(String(100), nullable=False)
     risk_level             = Column(String(30), nullable=False)
     estimated_risk_percent = Column(Float, nullable=False)
-    confidence_score       = Column(Float, nullable=False, default=90.0)
+    # A calibrated partial-data risk score is valid without a separate
+    # confidence metric.  Keep this nullable rather than inventing one.
+    confidence_score       = Column(Float, nullable=True, default=None)
     forecast_period        = Column(String(50), default="Next 24–72 hrs")
     details                = Column(Text, nullable=True)  # JSON-encoded raw factors/payload
     created_at             = Column(DateTime(timezone=True),
@@ -521,6 +561,7 @@ class UserPrediction(Base):
     def to_dict(self):
         return {
             "id": self.id,
+            "assessment_id": self.assessment_id,
             "user_id": self.user_id,
             "locality": self.locality,
             "risk_level": self.risk_level,

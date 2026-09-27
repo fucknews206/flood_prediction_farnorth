@@ -9,13 +9,13 @@ Discharge & telemetry architecture (four tiers):
        data_quality/farnorth_consolidation/glofas_ewds_latest.parquet
      Loaded here when available to augment or confirm the Open-Meteo reading.
   3. NOWCAST (keyless, real-time): RainViewer satellite radar reflectivity.
-     Called per-request via _fetch_radar_nowcast().  Returns current storm
-     intensity (0–100 normalised scale) at locality's lat/lon.  Amplifies
-     short-term rainfall features in operational ML inference.
+     It is displayed as a visual, recent radar layer only.  It has no
+     point-value API in this integration and is not a model feature or gate.
   4. INUNDATION SATELLITE (keyless, public): NASA OPERA DSWx-S1 Sentinel-1 SAR.
      Called per-request via _fetch_opera_sar_inundation().  Queries NASA CMR
-     for the latest Sentinel-1 Dynamic Surface Water Extent product to assess
-     ground-level standing water and flood extent regardless of cloud cover.
+     for the latest Sentinel-1 Dynamic Surface Water Extent product.  It is
+     supporting evidence only and cannot block a score from validated core
+     hydrometeorological inputs.
 
 This is a rules-based weighted formula, not trained ML.  Verified events are
 used for historical context/validation only; they are never model-training
@@ -23,11 +23,13 @@ rows.
 """
 from __future__ import annotations
 import json, math, time, urllib.parse, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 import pandas as pd
 import duckdb
 import joblib
+from farnorth_environment import EnvironmentalOrchestrator, OperaSurfaceWaterProvider, assess_model_eligibility, persist_observation_audit
 
 def norm(v):
     import unicodedata, re
@@ -42,10 +44,12 @@ DB=OUT/'farnorth_interim.duckdb'
 RISK_CACHE=OUT/'farnorth_locality_risk_cache.parquet'
 OPERATIONAL_MODEL=OUT/'farnorth_operational_model.joblib'
 EXPLORATORY_MODEL=OUT/'farnorth_exploratory_rf_basin.joblib'
+PARTIAL_LIVE_MODEL=OUT/'farnorth_partial_live_model.joblib'
 EWDS_DISCHARGE_PARQUET=OUT/'glofas_ewds_latest.parquet'  # Written by DataCollectorAgent when EWDS key is set
 MODEL_TYPE='Operational Hybrid Ensemble (Calibrated HistGradientBoosting ML + Terrain Susceptibility & Hydrological Thresholds)'
 
 _OPERATIONAL_MODEL_CACHE = None
+_PARTIAL_LIVE_MODEL_CACHE = None
 
 def _operational_model():
     """Load the calibrated operational ML model once per worker process."""
@@ -57,10 +61,22 @@ def _operational_model():
             _OPERATIONAL_MODEL_CACHE = None
     return _OPERATIONAL_MODEL_CACHE
 
+
+def _partial_live_model():
+    """Load the separately trained profile that excludes upstream windows only."""
+    global _PARTIAL_LIVE_MODEL_CACHE
+    if _PARTIAL_LIVE_MODEL_CACHE is None and PARTIAL_LIVE_MODEL.exists():
+        try:
+            _PARTIAL_LIVE_MODEL_CACHE = joblib.load(PARTIAL_LIVE_MODEL)
+        except Exception:
+            _PARTIAL_LIVE_MODEL_CACHE = None
+    return _PARTIAL_LIVE_MODEL_CACHE
+
 _CATALOGUE_CACHE = None
 _SCORES_CACHE = None
 _HYDRO_CACHE = None
 _RUNOFF_CACHE = None
+_RUNOFF_DAILY_CACHE = None
 
 def _catalogue():
     """Load the event catalogue once per worker process."""
@@ -120,6 +136,40 @@ def _hydrology_cache():
             _RUNOFF_CACHE = pd.DataFrame()
     return _HYDRO_CACHE, _RUNOFF_CACHE
 
+
+def _historical_runoff_for_locality(name, reference_date=None):
+    """Return the locality's real ERA5-Land daily runoff on/before a date.
+
+    The source is historical/reanalysis context, not a pretend current value.
+    Location matching is the project's existing name-to-ERA5 grid association
+    used to materialise ``farnorth_locality_runoff_daily.parquet``.
+    """
+    global _RUNOFF_DAILY_CACHE
+    if _RUNOFF_DAILY_CACHE is None:
+        path = OUT / 'farnorth_locality_runoff_daily.parquet'
+        try:
+            frame = _read_parquet(path, columns=['name', 'date', 'runoff_mm', 'sub_surface_runoff_mm'])
+            frame['date'] = pd.to_datetime(frame['date'], errors='coerce').dt.date
+            _RUNOFF_DAILY_CACHE = frame.dropna(subset=['name', 'date']).sort_values(['name', 'date'])
+        except Exception:
+            _RUNOFF_DAILY_CACHE = pd.DataFrame(columns=['name', 'date', 'runoff_mm', 'sub_surface_runoff_mm'])
+    target = pd.Timestamp(reference_date or datetime.now(timezone.utc).date()).date()
+    rows = _RUNOFF_DAILY_CACHE[(_RUNOFF_DAILY_CACHE['name'] == name) & (_RUNOFF_DAILY_CACHE['date'] <= target)]
+    if rows.empty:
+        return None
+    item = rows.iloc[-1]
+    value = item.get('runoff_mm')
+    if pd.isna(value) or not isinstance(value, (int, float)) or not math.isfinite(float(value)) or float(value) < 0:
+        return None
+    return {
+        'value': float(value),
+        'date': item['date'].isoformat(),
+        'sub_surface_runoff_mm': (float(item['sub_surface_runoff_mm']) if pd.notna(item.get('sub_surface_runoff_mm')) else None),
+        'dataset': 'farnorth_locality_runoff_daily.parquet',
+        'source_type': 'historical_reanalysis',
+        'unit': 'mm',
+    }
+
 def _read_parquet(path, columns=None):
     """Read parquet with a DuckDB fallback for the API virtualenv."""
     try:
@@ -161,12 +211,15 @@ def _forecast(lat,lon,p90=None,soil_median=None):
     cached=_FORECAST_CACHE.get(cache_key)
     if cached and time.time() - cached[0] < _FORECAST_CACHE_TTL_SECONDS:
         return cached[1]
-    params=urllib.parse.urlencode({'latitude':lat,'longitude':lon,'hourly':'precipitation,soil_moisture_0_to_7cm','forecast_days':3,'timezone':'UTC'})
+    # ``runoff`` is the provider-supported total runoff variable.  It is
+    # requested with the rain and soil fields so one live weather request
+    # supplies all three signals for a locality.
+    params=urllib.parse.urlencode({'latitude':lat,'longitude':lon,'hourly':'precipitation,soil_moisture_0_to_7cm,runoff','past_days':1,'forecast_days':3,'timezone':'UTC'})
     url='https://api.open-meteo.com/v1/forecast?'+params
     try:
         raw_bytes = _robust_urlopen(url, timeout=15, retries=3)
         raw = json.loads(raw_bytes.decode('utf-8'))
-        h=raw.get('hourly',{}); p=h.get('precipitation',[]); s=h.get('soil_moisture_0_to_7cm',[]); times=h.get('time',[])
+        h=raw.get('hourly',{}); p=h.get('precipitation',[]); s=h.get('soil_moisture_0_to_7cm',[]); runoff=h.get('runoff',[]); times=h.get('time',[])
         # Aggregate to 6-hour windows and apply rainfall/soil threshold logic.
         out=[]
         for i in range(0,len(times),6):
@@ -175,31 +228,29 @@ def _forecast(lat,lon,p90=None,soil_median=None):
         for i,item in enumerate(out):
             item['rainfall_3d_forecast_mm']=round(sum(x['precipitation_6h_mm'] for x in out[max(0,i-11):i+1]),2)
             item['threshold_signal']=int(p90 is not None and soil_median is not None and item['rainfall_3d_forecast_mm']>p90 and item['soil_moisture_mean']>soil_median)
-        result={'source':'Open-Meteo','fetched_at':datetime.now(timezone.utc).isoformat(),'trajectory':out}
+        live_runoff = next((float(v) for v in reversed(runoff) if v is not None), None)
+        result={
+            'source':'Open-Meteo Weather API',
+            'fetched_at':datetime.now(timezone.utc).isoformat(),
+            'trajectory':out,
+            'runoff_mm':live_runoff,
+            'runoff_status':'available' if live_runoff is not None else 'unavailable',
+            'runoff_source':'Open-Meteo weather-model total runoff',
+        }
         _FORECAST_CACHE[cache_key]=(time.time(), result)
         return result
-    except Exception as e: return {'source':'Open-Meteo','error':str(e),'trajectory':[]}
+    except Exception as e: return {'source':'Open-Meteo Weather API','error':str(e),'trajectory':[], 'runoff_mm':None, 'runoff_status':'unavailable', 'runoff_source':'Open-Meteo weather-model total runoff'}
 
 _DISCHARGE_CACHE = {}
 _RADAR_CACHE: dict = {}
 _RADAR_CACHE_TTL_SECONDS = 120  # Radar frames update every ~2 min; cache for 2 min
 
 def _fetch_radar_nowcast(lat: float, lon: float) -> dict:
-    """Fetch the latest RainViewer satellite radar frame and return storm intensity.
+    """Report RainViewer map-frame availability, never a numerical feature.
 
-    RainViewer provides global precipitation radar composites at ~2-minute
-    refresh intervals.  This function:
-      1. Fetches the `/api/maps/2.0/` manifest to discover the latest available
-         radar frame timestamp.
-      2. Queries the colour-value tile at the locality's lat/lon to read the
-         dBZ-encoded reflectivity pixel.  Because tile images require a browser,
-         we instead use the RainViewer coverage endpoint which returns the
-         nearest-cell precipitation rate in mm/hr for a given lat/lon.
-      3. Normalises the mm/hr value to a 0–100 intensity score.
-
-    Returns dict with keys:
-      source, fetched_at, latest_frame_ts, radar_mmhr, radar_intensity (0-100),
-      storm_active (bool), status.
+    The former code derived a pseudo-intensity from PNG alpha values. Tile
+    transparency is a rendering property, not rainfall/radar measurement, so
+    it is deliberately not downloaded or converted to a number.
     """
     cache_key = (round(float(lat), 3), round(float(lon), 3))
     cached = _RADAR_CACHE.get(cache_key)
@@ -212,62 +263,34 @@ def _fetch_radar_nowcast(lat: float, lon: float) -> dict:
         manifest = json.loads(manifest_bytes.decode('utf-8'))
         # Navigate: radar -> past -> list of {time, ...}
         radar_past = manifest.get('radar', {}).get('past', [])
-        latest_ts = int(radar_past[-1]['time']) if radar_past else None
+        latest_frame = radar_past[-1] if radar_past else None
+        latest_ts = int(latest_frame['time']) if latest_frame else None
 
-        # Step 2: read precipitation rate from the RainViewer data tile API
-        # The /v2/radar endpoint returns JSON with precipitation at a lat/lon.
-        if latest_ts is not None:
-            data_url = (
-                f'https://tilecache.rainviewer.com/v2/radar/{latest_ts}/256/6/'
-                f'{_lat_lon_to_tile_z6(lat, lon)}.png'
-            )
-            # We cannot decode a PNG pixel in stdlib; use the RainViewer public
-            # "weather-maps.json" color value lookup instead.  For simplicity,
-            # proxy via the public JSON "nowcast" endpoint available for free:
-            # https://api.rainviewer.com/public/weather-maps.json has a
-            # satellite->infrared block; radar past frames index by Unix ts.
-            # Approximate precipitation by finding the most intense radar color.
-            # FALLBACK: use Open-Meteo short-range (1-hour) precipitation as proxy.
-            params = urllib.parse.urlencode({
-                'latitude': lat, 'longitude': lon,
-                'hourly': 'precipitation',
-                'forecast_days': 1,
-                'timezone': 'UTC',
-                'forecast_hours': 1,
-            })
-            om_url = 'https://api.open-meteo.com/v1/forecast?' + params
-            om_bytes = _robust_urlopen(om_url, timeout=10, retries=2)
-            om_raw = json.loads(om_bytes.decode('utf-8'))
-            precip_vals = om_raw.get('hourly', {}).get('precipitation', [])
-            # Latest hour = first element in the 1-day 1-hour slice
-            precip_mmhr = float(precip_vals[0]) if precip_vals and precip_vals[0] is not None else 0.0
-        else:
-            precip_mmhr = 0.0
-
-        # Normalise: 0 mm/hr → 0, ≥ 25 mm/hr (heavy rain) → 100
-        radar_intensity = min(100.0, round((precip_mmhr / 25.0) * 100.0, 1))
-        storm_active = precip_mmhr >= 2.0
-
+        if latest_ts is None:
+            raise RuntimeError('RainViewer returned no radar frames')
         result = {
-            'source': 'RainViewer manifest + Open-Meteo 1-hour precipitation nowcast',
+            'source': 'RainViewer radar visualization',
             'fetched_at': datetime.now(timezone.utc).isoformat(),
             'latest_frame_ts': latest_ts,
-            'radar_mmhr': round(precip_mmhr, 3),
-            'radar_intensity': radar_intensity,
-            'storm_active': storm_active,
-            'status': 'available',
+            'radar_mmhr': None,
+            'radar_intensity': None,
+            'storm_active': None,
+            'status': 'REAL_RECENT_BUT_NOT_CURRENT',
+            'quality': 'VISUAL_ONLY',
+            'frame_path': latest_frame.get('path'),
         }
         _RADAR_CACHE[cache_key] = (time.time(), result)
         return result
     except Exception as e:
         return {
-            'source': 'RainViewer + Open-Meteo nowcast',
+            'source': 'RainViewer radar visualization',
             'fetched_at': datetime.now(timezone.utc).isoformat(),
             'latest_frame_ts': None,
-            'radar_mmhr': 0.0,
-            'radar_intensity': 0.0,
-            'storm_active': False,
-            'status': 'unavailable',
+            'radar_mmhr': None,
+            'radar_intensity': None,
+            'storm_active': None,
+            'status': 'PROVIDER_ERROR',
+            'quality': 'UNAVAILABLE',
             'error': str(e),
         }
 
@@ -409,6 +432,8 @@ def _fetch_opera_sar_inundation(lat: float, lon: float) -> dict:
 
 def _fetch_river_discharge(lat, lon, past_days=14, forecast_days=14):
     """Query Open-Meteo Flood API (GloFAS model) for live river discharge in m3/s."""
+    if not (-90 <= float(lat) <= 90 and -180 <= float(lon) <= 180):
+        return {'status': 'INVALID_VALUE', 'source': 'Open-Meteo GloFAS Flood API', 'latest': None, 'by_date': {}, 'error': 'Invalid latitude/longitude'}
     cache_key = (round(float(lat), 3), round(float(lon), 3))
     cached = _DISCHARGE_CACHE.get(cache_key)
     if cached and time.time() - cached[0] < _FORECAST_CACHE_TTL_SECONDS:
@@ -427,20 +452,24 @@ def _fetch_river_discharge(lat, lon, past_days=14, forecast_days=14):
         d = raw.get('daily', {})
         times = d.get('time', [])
         vals = d.get('river_discharge', [])
-        by_date = {str(t): float(v) for t, v in zip(times, vals) if v is not None}
+        by_date = {str(t): float(v) for t, v in zip(times, vals) if isinstance(v, (int, float)) and math.isfinite(float(v)) and float(v) >= 0}
         today = datetime.now(timezone.utc).date().isoformat()
-        latest = by_date.get(today) or (list(by_date.values())[-1] if by_date else None)
+        # A genuine zero discharge is valid.  Do not use truthiness here: doing
+        # so previously replaced a zero for today with an unrelated future date.
+        latest = by_date[today] if today in by_date else (list(by_date.values())[-1] if by_date else None)
         result = {
-            'status': 'available' if by_date else 'unavailable',
+            'status': 'REAL_CURRENT' if by_date else 'NO_DATA',
             'source': 'Open-Meteo GloFAS Flood API',
             'latest': latest,
             'by_date': by_date,
             'fetched_at': datetime.now(timezone.utc).isoformat(),
+            'actual_latitude': raw.get('latitude'),
+            'actual_longitude': raw.get('longitude'),
         }
         _DISCHARGE_CACHE[cache_key] = (time.time(), result)
         return result
     except Exception as e:
-        return {'status': 'unavailable', 'source': 'Open-Meteo GloFAS Flood API (unavailable)', 'latest': None, 'by_date': {}, 'error': str(e)}
+        return {'status': 'PROVIDER_ERROR', 'source': 'Open-Meteo GloFAS Flood API', 'latest': None, 'by_date': {}, 'error': str(e)}
 
 
 class RequiredLiveDataUnavailable(RuntimeError):
@@ -579,9 +608,9 @@ def get_forecasted_features(locality_name_or_lat_lon, target_date=None, days=5):
     raw = json.loads(raw_bytes.decode('utf-8'))
     hourly=raw.get('hourly',{}); times=hourly.get('time',[]); precip=hourly.get('precipitation',[]); soil=hourly.get('soil_moisture_0_to_7cm',[])
     issue=raw.get('generationtime_ms')
-    # Verify all three live providers before deriving a forecast or running a
-    # classifier. An old local GloFAS file must never make a live outage look
-    # like a valid current prediction.
+    # Report every provider independently.  A missed SAR pass or delayed
+    # discharge update must not suppress a valid Open-Meteo rainfall forecast.
+    # The UI can still disclose which parts of the prediction are unavailable.
     weather_status = {
         'source': 'Open-Meteo Weather API',
         'trajectory': times,
@@ -589,30 +618,41 @@ def get_forecasted_features(locality_name_or_lat_lon, target_date=None, days=5):
         'error': None if times else 'Open-Meteo returned no hourly forecast',
     }
     live_disch = _fetch_river_discharge(lat, lon, past_days=10, forecast_days=int(days)+2)
-    sar_info = _fetch_opera_sar_inundation(lat, lon)
-    provider_status = _require_live_prediction_inputs(weather_status, live_disch, sar_info)
+    # OPERA discovery/browse imagery is not a numerical locality observation.
+    # Keep its explicitly unavailable state instead of deriving a percentage
+    # from a PNG or an unvalidated scene selection.
+    sar_observation = OperaSurfaceWaterProvider().get(lat, lon)
+    provider_status = {
+        'ready': bool(weather_status['trajectory']),
+        'providers': {
+            'openmeteo': {'source': weather_status['source'], 'status': 'available' if weather_status['trajectory'] else 'unavailable', 'fetched_at': weather_status['fetched_at'], 'error': weather_status['error']},
+            'glofas': {'source': live_disch.get('source'), 'status': live_disch.get('status', 'NO_DATA'), 'fetched_at': live_disch.get('fetched_at'), 'error': live_disch.get('error')},
+            'nasa_opera': {'source': sar_observation.provider_product, 'status': sar_observation.status, 'fetched_at': sar_observation.retrieved_at, 'error': sar_observation.error_message},
+        },
+    }
+    provider_status['unavailable'] = [name for name, item in provider_status['providers'].items() if item['status'] not in {'available', 'REAL_CURRENT', 'REAL_FORECAST', 'REAL_HISTORICAL'}]
     daily={}
     for t,p,s in zip(times,precip,soil):
-        day=str(t)[:10]; z=daily.setdefault(day,{'precipitation_mm':0.0,'soil':[]}); z['precipitation_mm']+=float(p or 0); z['soil'].append(s)
+        day=str(t)[:10]; z=daily.setdefault(day,{'precipitation_mm':0.0,'soil':[], 'precipitation_missing':False})
+        if p is None:
+            z['precipitation_missing']=True
+        elif isinstance(p, (int, float)) and float(p) >= 0:
+            z['precipitation_mm']+=float(p)
+        else:
+            z['precipitation_missing']=True
+        z['soil'].append(s)
     ordered=sorted(daily); out=[]; rolling=[]
     for day in ordered:
-        rolling.append(daily[day]['precipitation_mm']); soilvals=[x for x in daily[day]['soil'] if x is not None]
-        rain3=sum(rolling[-3:]); flag=int(rain3>p90 and med is not None and (sum(soilvals)/len(soilvals))>float(med))
-        out.append({'date':day,'local_rainfall_1d_mm':round(rolling[-1],2),'local_rainfall_3d_mm':round(rain3,2),'soil_moisture':round(sum(soilvals)/len(soilvals),4) if soilvals else None,'basin_rainfall_7d_mm':None,'basin_rainfall_14d_mm':None,'basin_rainfall_21d_mm':None,'basin_rainfall_30d_mm':None,'glofas_discharge_m3s':None,'option_b_threshold_flag':flag,'option_b_risk_level':'HIGH' if flag else 'BASELINE','classifier_probability':None,'method_disagreement':'NOT_AVAILABLE_UNTIL_GLOFAS_FORECAST'})
+        rolling.append(None if daily[day]['precipitation_missing'] else daily[day]['precipitation_mm']); soilvals=[x for x in daily[day]['soil'] if isinstance(x, (int, float))]
+        rain3=sum(x for x in rolling[-3:] if x is not None) if len(rolling[-3:]) == 3 and all(x is not None for x in rolling[-3:]) else None
+        soil_mean=(sum(soilvals)/len(soilvals)) if soilvals else None
+        flag=int(rain3 is not None and soil_mean is not None and rain3>p90 and med is not None and soil_mean>float(med))
+        out.append({'date':day,'local_rainfall_1d_mm':round(rolling[-1],2) if rolling[-1] is not None else None,'local_rainfall_3d_mm':round(rain3,2) if rain3 is not None else None,'soil_moisture':round(soil_mean,4) if soil_mean is not None else None,'basin_rainfall_7d_mm':None,'basin_rainfall_14d_mm':None,'basin_rainfall_21d_mm':None,'basin_rainfall_30d_mm':None,'glofas_discharge_m3s':None,'option_b_threshold_flag':flag if rain3 is not None and soil_mean is not None else None,'option_b_risk_level':'ELEVATED' if flag else ('BASELINE' if rain3 is not None and soil_mean is not None else 'UNAVAILABLE'),'classifier_probability':None,'method_disagreement':None})
     # GloFAS was verified above; use that same live response for the feature set.
     discharge = dict(live_disch.get('by_date', {}))
     glofas_ok = bool(discharge)
     forecast_reference_date = datetime.now(timezone.utc).date()
 
-    # Fallback to offline static snapshot if live endpoint is unreachable
-    if not glofas_ok:
-        gf=OUT/'glofas_forecast_2026_09_07.parquet'
-        if gf.exists():
-            gd=_read_parquet(gf); gd['date']=pd.to_datetime(gd['date']).dt.strftime('%Y-%m-%d')
-            discharge={str(r.date):float(r.discharge_m3s_forecast) for r in gd[gd['name']==name].itertuples()}
-            glofas_ok = bool(discharge)
-            if 'forecast_reference_time' in gd.columns and len(gd):
-                forecast_reference_date=pd.Timestamp(gd['forecast_reference_time'].iloc[0]).date()
     historical_discharge={}
     hist_path=OUT/'locality_subsets'/'glofas_34.parquet'
     if hist_path.exists():
@@ -620,15 +660,13 @@ def get_forecasted_features(locality_name_or_lat_lon, target_date=None, days=5):
         hname='locality' if 'locality' in hd.columns else 'name'; hval='discharge_m3s' if 'discharge_m3s' in hd.columns else 'dis24'
         if hval in hd.columns:
             historical_discharge={str(r.date):float(getattr(r,hval)) for r in hd[hd[hname]==name].itertuples() if pd.notna(getattr(r,hval))}
-    try:
-        payload=joblib.load(EXPLORATORY_MODEL); clf=payload['model']; model_features=payload['features']
-        lookup=_read_parquet(OUT/'farnorth_locality_environment_lookup.parquet')
-        lr=lookup[lookup['name']==name].iloc[0]
-        static_l={'elevation_m':float(lr.elevation_m),'slope_deg':float(lr.slope_deg),'basin_id':float(lr.basin_id),'season':int(month in [4,5,6,7,8,9,10])}
-    except Exception:
-        clf=None; model_features=[]; static_l={}
+    # The exploratory model was trained on CHIRPS/ERA5/historical GloFAS.  The
+    # live path uses different sources and previously fabricated lag values, so
+    # its probability is withheld until production-source compatibility is
+    # validated.  A missing prediction is safer than a plausible-looking one.
+    clf=None; model_features=[]; static_l={}
     out=out[:int(days)]
-    rains=[float(x['local_rainfall_1d_mm']) for x in out]
+    rains=[float(x['local_rainfall_1d_mm']) if x['local_rainfall_1d_mm'] is not None else None for x in out]
     basin_daily_payload=None; upstream_ids=set(); basin_query_count=0
     try:
         ref_for_basin=str(forecast_reference_date or pd.Timestamp(out[0]['date']).date())
@@ -641,31 +679,26 @@ def get_forecasted_features(locality_name_or_lat_lon, target_date=None, days=5):
     for item in out:
         vals=[basin_daily_payload.get('basin_daily',{}).get(str(b),{}).get(item['date']) for b in upstream_ids] if basin_daily_payload else []
         vals=[float(v) for v in vals if v is not None]
-        basin_rains.append(sum(vals)/len(vals) if vals else float(item['local_rainfall_1d_mm']))
+        basin_rains.append(sum(vals)/len(vals) if vals else item['local_rainfall_1d_mm'])
     last_known_discharge=list(discharge.values())[-1] if discharge else None
     for i,item in enumerate(out):
-        item['glofas_discharge_m3s']=discharge.get(item['date']) if (glofas_ok and item['date'] in discharge) else (last_known_discharge if glofas_ok else None)
-        # The first forecast day has no forecast lag history; using the first
-        # available lead is explicit and preferable to silently fabricating a
-        # historical observation.
+        item['glofas_discharge_m3s']=discharge.get(item['date']) if (glofas_ok and item['date'] in discharge) else None
+        # Production features require genuine historical lag dates.  A current
+        # or forecast discharge must never be copied into a lagged column.
         q=item['glofas_discharge_m3s']
         lag_values={}; used_forecast_fallback=False
         if q is not None:
             for lag in (1,3,7):
                 lag_date=(pd.Timestamp(item['date'])-pd.Timedelta(days=lag)).strftime('%Y-%m-%d')
-                if forecast_reference_date is not None and pd.Timestamp(lag_date).date() <= forecast_reference_date:
-                    lag_values[lag]=historical_discharge.get(lag_date)
-                else:
-                    lag_values[lag]=discharge.get(lag_date, q)
-                    used_forecast_fallback=True
+                lag_values[lag]=historical_discharge.get(lag_date)
                 item[f'glofas_discharge_lag{lag}']=lag_values[lag]
         past_missing=any(v is None for v in lag_values.values()) if lag_values else True
         item['discharge_lag_fallback']=bool(used_forecast_fallback)
         item['discharge_lag_historical_unavailable']=bool(q is not None and past_missing and not used_forecast_fallback)
-        item['discharge_lag_note']='early forecast days use the nearest available lead time in place of a true historical lag - treat these days\' RF probability with extra caution.' if item['discharge_lag_fallback'] else ('historical GloFAS date is not present locally; RF score withheld for this day.' if item['discharge_lag_historical_unavailable'] else None)
-        item['discharge_lag_source']='forecast lead fallback' if item['discharge_lag_fallback'] else ('historical GloFAS' if not item['discharge_lag_historical_unavailable'] else 'historical unavailable')
-        vals={3:sum(basin_rains[max(0,i-2):i+1]),7:sum(basin_rains[max(0,i-6):i+1]),14:sum(basin_rains[max(0,i-13):i+1]),21:sum(basin_rains[max(0,i-20):i+1]),30:sum(basin_rains[max(0,i-29):i+1])}
-        item.update({f'basin_rainfall_{w}d_mm':round(v,2) for w,v in vals.items()})
+        item['discharge_lag_note']='Required historical GloFAS lag is unavailable; quantitative score is withheld for this day.' if item['discharge_lag_historical_unavailable'] else None
+        item['discharge_lag_source']='historical GloFAS' if not item['discharge_lag_historical_unavailable'] else 'historical unavailable'
+        vals={window:(sum(v for v in basin_rains[max(0,i-window+1):i+1] if v is not None) if len(basin_rains[max(0,i-window+1):i+1]) == window and all(v is not None for v in basin_rains[max(0,i-window+1):i+1]) else None) for window in (3,7,14,21,30)}
+        item.update({f'basin_rainfall_{w}d_mm':round(v,2) if v is not None else None for w,v in vals.items()})
         if clf is not None and q is not None and all(item.get(f'glofas_discharge_lag{lag}') is not None for lag in (1,3,7)):
             frame={
                 'rainfall_1d':rains[i], 'rainfall_3d':vals[3], 'rainfall_7d':vals[7],
@@ -678,10 +711,79 @@ def get_forecasted_features(locality_name_or_lat_lon, target_date=None, days=5):
                 item['classifier_probability']=round(float(clf.predict_proba(pd.DataFrame([frame])[model_features])[0,1]),4)
                 item['method_disagreement']=bool(bool(item['option_b_threshold_flag']) != (item['classifier_probability'] >= .5))
     basin_complete=bool(basin_daily_payload and upstream_ids and all(any(basin_daily_payload.get('basin_daily',{}).get(str(b),{}).get(item['date']) is not None for b in upstream_ids) for item in out))
-    return {'locality':name,'target_date':str(target_date or ordered[0] if ordered else target_date),'forecast_issue_time':datetime.now(timezone.utc).isoformat(),'source':'Open-Meteo Weather + Open-Meteo GloFAS Flood API + NASA OPERA DSWx-S1','provider_status':provider_status,'glofas_forecast_available':bool(glofas_ok),'glofas_forecast_status':'AVAILABLE' if glofas_ok else 'PENDING_DOWNLOAD','glofas_forecast_note':'Nearest-cell ensemble mean; forecast lag fields use the first available lead when prior leads are unavailable.','basin_rainfall_data_source':'Open-Meteo forecast queried at each confirmed upstream-basin centroid and averaged across the locality\'s upstream basin set; rolling windows use that daily basin mean.','upstream_basin_rainfall_status':'UPSTREAM_CENTROID_AGGREGATION' if basin_complete else 'PARTIAL_UPSTREAM_CENTROID_AGGREGATION','upstream_basin_count':int(len(upstream_ids)),'upstream_basin_centroids_queried':int(len(upstream_ids)),'upstream_basin_http_queries':basin_query_count,'trajectory':out,'classifier_status':'AVAILABLE' if glofas_ok else 'BLOCKED_UNTIL_GLOFAS_FORECAST','option_b_note':'Option B is independently evaluated; outputs are not blended.'}
+    return {'locality':name,'target_date':str(target_date or ordered[0] if ordered else target_date),'forecast_issue_time':datetime.now(timezone.utc).isoformat(),'source':'Open-Meteo Weather + Open-Meteo GloFAS Flood API','provider_status':provider_status,'glofas_forecast_available':bool(glofas_ok),'glofas_forecast_status':'REAL_FORECAST' if glofas_ok else 'NO_DATA','glofas_forecast_note':'Only live GloFAS dates are exposed; no archived snapshot is substituted.','basin_rainfall_data_source':'Open-Meteo forecast queried at upstream-basin centroids; values remain environmental context until production feature compatibility is validated.','upstream_basin_rainfall_status':'UPSTREAM_CENTROID_AGGREGATION' if basin_complete else 'PARTIAL_UPSTREAM_CENTROID_AGGREGATION','upstream_basin_count':int(len(upstream_ids)),'upstream_basin_centroids_queried':int(len(upstream_ids)),'upstream_basin_http_queries':basin_query_count,'trajectory':out,'classifier_status':'WITHHELD_UNVALIDATED_PRODUCTION_FEATURES','option_b_note':'Environmental threshold context only; no quantitative flood prediction is emitted from this forecast.'}
 
 # Public name used by the API/UI forecast flow.
 get_locality_forecast = get_forecasted_features
+
+
+def _partial_live_prediction(*, observations, discharge_series, row, hrow, rainfall_p90):
+    """Run only the separately trained profile for the available live subset.
+
+    This profile has no RainViewer, SAR, ERA5-Land runoff, or upstream-basin
+    columns. Its feature schema is fixed in the saved artifact; missing values
+    are a reason to decline this profile, never an opportunity to add zeros.
+    """
+    payload = _partial_live_model()
+    if not payload:
+        return None, ["partial_live_model_artifact"]
+    needed = ("precipitation_1d", "precipitation_3d", "precipitation_7d", "precipitation_14d", "soil_moisture_0_to_7cm", "river_discharge")
+    missing = [key for key in needed if key not in observations or not observations[key].is_valid]
+    if hrow is None or pd.isna(hrow.get('basin_id')) or pd.isna(row.get('elevation_m')) or pd.isna(row.get('slope_deg')):
+        missing.append("terrain")
+    discharge = observations.get("river_discharge")
+    valid_day = pd.Timestamp(discharge.valid_time).date() if discharge and discharge.valid_time else None
+    lag_values = {}
+    if valid_day:
+        for lag in (1, 3, 7):
+            lag_date = (pd.Timestamp(valid_day) - pd.Timedelta(days=lag)).date().isoformat()
+            value = discharge_series.get(lag_date)
+            if not isinstance(value, (int, float)) or not math.isfinite(float(value)) or float(value) < 0:
+                missing.append(f"discharge_lag{lag}")
+            else:
+                lag_values[lag] = float(value)
+    else:
+        missing.extend(["discharge_lag1", "discharge_lag3", "discharge_lag7"])
+    if missing:
+        return None, sorted(set(missing))
+    rainfall_1d = float(observations['precipitation_1d'].value)
+    rainfall_3d = float(observations['precipitation_3d'].value)
+    rainfall_7d = float(observations['precipitation_7d'].value)
+    rainfall_14d = float(observations['precipitation_14d'].value)
+    vector = {
+        'rainfall_1d': rainfall_1d,
+        'rainfall_3d': rainfall_3d,
+        'rainfall_7d': rainfall_7d,
+        'rainfall_14d': rainfall_14d,
+        'rainfall_anomaly': rainfall_7d - float(rainfall_p90),
+        'swvl1': float(observations['soil_moisture_0_to_7cm'].value),
+        'discharge_m3s': float(discharge.value),
+        'discharge_lag1': lag_values[1],
+        'discharge_lag3': lag_values[3],
+        'discharge_lag7': lag_values[7],
+        'elevation_m': float(row.elevation_m),
+        'slope_deg': float(row.slope_deg),
+        'basin_id': float(hrow.basin_id),
+        'season': int(datetime.now(timezone.utc).month in (4, 5, 6, 7, 8, 9, 10)),
+    }
+    features = payload['features']
+    if set(features) != set(vector):
+        return None, ["partial_live_model_schema_mismatch"]
+    frame = pd.DataFrame([[vector[name] for name in features]], columns=features)
+    score = float(payload['pipeline'].predict_proba(frame)[0, 1])
+    if not math.isfinite(score):
+        return None, ["partial_live_model_invalid_score"]
+    return {
+        'risk_score_percent': round(score * 100, 2),
+        'risk_level': 'HIGH' if score >= 0.67 else ('MODERATE' if score >= 0.34 else 'LOW'),
+        'model_name': payload['candidate_name'],
+        'model_version': payload['model_profile'],
+        'model_threshold': payload['threshold'],
+        'metrics': payload['metrics'],
+        'features_used': features,
+        'feature_values': vector,
+        'source_provenance': payload.get('source_provenance', {}),
+    }, []
 
 def get_locality_risk(locality_name_or_lat_lon):
     """Return a JSON-serialisable risk bundle for a locality or ``lat,lon``."""
@@ -690,10 +792,19 @@ def get_locality_risk(locality_name_or_lat_lon):
     p90=float(cache.rainfall_3d_p90)
     soil_col=f'soil_median_m{month:02d}'
     month_median=cache.get(soil_col)
-    # Live data tier 1: Open-Meteo weather forecast + soil moisture.
-    fc=_forecast(float(row.lat),float(row.lon),p90,month_median)
+    lat, lon = float(row.lat), float(row.lon)
+    # Retrieve independent providers together.  A slow or unavailable satellite
+    # product must not hide valid rainfall, discharge, radar, or runoff values.
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        weather_task = pool.submit(_forecast, lat, lon, p90, month_median)
+        discharge_task = pool.submit(_fetch_river_discharge, lat, lon, 7, 3)
+        radar_task = pool.submit(_fetch_radar_nowcast, lat, lon)
+        sar_task = pool.submit(_fetch_opera_sar_inundation, lat, lon)
+        fc = weather_task.result()
+        disch_info = discharge_task.result()
+        radar_info = radar_task.result()
+        sar_info = sar_task.result()
     # Live data tier 2: GloFAS river discharge (Open-Meteo Flood API).
-    disch_info = _fetch_river_discharge(float(row.lat), float(row.lon), past_days=7, forecast_days=3)
     disch_latest = disch_info.get('latest')
     disch_status = disch_info.get('status', 'unavailable')
     disch_source = disch_info.get('source', 'Open-Meteo GloFAS Flood API')
@@ -701,22 +812,45 @@ def get_locality_risk(locality_name_or_lat_lon):
     hydro, runoff_table = _hydrology_cache()
     hrow = hydro.loc[name] if name in hydro.index else None
     rrow = runoff_table.loc[name] if name in runoff_table.index else None
-    runoff_latest = (rrow.get('runoff_mm_latest') if rrow is not None else None)
+    cached_runoff = (rrow.get('runoff_mm_latest') if rrow is not None else None)
     ssro_latest = (rrow.get('sub_surface_runoff_mm_latest') if rrow is not None else None)
     drainage_density = (hrow.get('drainage_density_km_per_km2') if hrow is not None else None)
     runoff_date = (rrow.get('runoff_latest_date') if rrow is not None else None)
-    runoff_latest = float(runoff_latest) if pd.notna(runoff_latest) else None
+    cached_runoff = float(cached_runoff) if pd.notna(cached_runoff) else None
     ssro_latest = float(ssro_latest) if pd.notna(ssro_latest) else None
     drainage_density = float(drainage_density) if pd.notna(drainage_density) else None
+    # The provider returns runoff for supported weather models.  At Blangoua
+    # the current Open-Meteo model can return null; retain the last validated
+    # ERA5-Land observation in that case, but explicitly mark it historical.
+    live_runoff = fc.get('runoff_mm')
+    runoff_latest = float(live_runoff) if live_runoff is not None else cached_runoff
+    runoff_status = fc.get('runoff_status', 'unavailable')
+    runoff_source = fc.get('runoff_source', 'Open-Meteo weather-model total runoff')
+    if runoff_latest is None:
+        runoff_status = 'unavailable'
+    elif runoff_status != 'available':
+        runoff_status = 'historical'
+        runoff_source = 'ERA5-Land validated daily runoff cache (latest available observation)'
     # Live data tier 3: RainViewer satellite radar nowcast.
-    radar_info = _fetch_radar_nowcast(float(row.lat), float(row.lon))
     radar_intensity = float(radar_info.get('radar_intensity', 0.0))
-    radar_mmhr = float(radar_info.get('radar_mmhr', 0.0))
+    radar_mmhr = radar_info.get('radar_mmhr')
     radar_storm_active = bool(radar_info.get('storm_active', False))
 
     # Live data tier 4: NASA OPERA DSWx-S1 Sentinel-1 SAR flood inundation.
-    sar_info = _fetch_opera_sar_inundation(float(row.lat), float(row.lon))
-    provider_status = _require_live_prediction_inputs(fc, disch_info, sar_info)
+    # Provider availability is returned per source.  Risk remains available
+    # when a satellite pass has not occurred, rather than replacing every card
+    # with fabricated reference values.
+    provider_status = {
+        'ready': bool(fc.get('trajectory')) and disch_status == 'available',
+        'providers': {
+            'openmeteo': {'source': fc.get('source'), 'status': 'available' if fc.get('trajectory') else 'unavailable', 'fetched_at': fc.get('fetched_at'), 'error': fc.get('error')},
+            'glofas': {'source': disch_source, 'status': disch_status, 'fetched_at': disch_info.get('fetched_at'), 'error': disch_info.get('error')},
+            'rainviewer': {'source': radar_info.get('source'), 'status': radar_info.get('status', 'unavailable'), 'fetched_at': radar_info.get('fetched_at'), 'error': radar_info.get('error')},
+            'era5_runoff': {'source': runoff_source, 'status': runoff_status, 'fetched_at': fc.get('fetched_at') if runoff_status == 'available' else runoff_date, 'error': fc.get('error') if runoff_status == 'unavailable' else None},
+            'nasa_opera': {'source': sar_info.get('source'), 'status': sar_info.get('status', 'unavailable'), 'fetched_at': sar_info.get('fetched_at'), 'error': sar_info.get('error') or sar_info.get('message')},
+        },
+    }
+    provider_status['unavailable'] = [key for key, value in provider_status['providers'].items() if value['status'] == 'unavailable']
     sar_fraction = float(sar_info.get('sar_inundation_fraction', 0.0))
     sar_water_detected = bool(sar_info.get('water_detected', False))
 
@@ -744,7 +878,7 @@ def get_locality_risk(locality_name_or_lat_lon):
         pd.notna(row.get('elevation_m')),
         pd.notna(row.get('river_distance_m')),
         pd.notna(drainage_density),
-        pd.notna(runoff_latest),
+        runoff_latest is not None,
         disch_latest is not None,
         sar_info.get('status') == 'available',
     ]
@@ -845,10 +979,160 @@ def get_locality_risk(locality_name_or_lat_lon):
 
     risk_level = 'HIGH' if blended_risk>=67 else ('MEDIUM' if blended_risk>=34 else 'LOW')
 
-    result={'locality':name,'coordinates':{'lat':float(row.lat),'lon':float(row.lon)},'grid_references':{'era5':f'{float(cache.era_lat):.3f},{float(cache.era_lon):.3f}','glofas':cache.glofas_cell_reference},'provider_status':provider_status,'risk_level':risk_level,'estimated_risk_percent':blended_risk,'ml_probability':ml_prob,'ml_risk_percent':ml_risk_percent,'heuristic_risk_percent':estimated,'estimated_risk_components':{'susceptibility_score':static,'threshold_signal':threshold,'nearby_verified_event_density':density,'ml_calibrated_probability':ml_prob,'radar_intensity_nowcast':radar_intensity,'sar_inundation_fraction':sar_fraction,'sar_risk_boost':sar_risk_boost,'weights':{'heuristic_susceptibility_blend':0.50,'calibrated_ml_blend':0.50} if ml_risk_percent is not None else {'susceptibility':.60,'threshold':.25,'event_density':.15}},'confidence_score':confidence,'confidence_components':{'grid_match_quality':grid,'dem_slope_completeness':completeness,'nearby_verified_event_count':event_count,'nearby_verified_event_density':density,'forecast_data_freshness':freshness,'radar_nowcast_available':radar_info.get('status')=='available','sar_telemetry_available':sar_info.get('status')=='available','sar_inundation_fraction':sar_fraction},'nearby_verified_event_density':density,'current_conditions':{'date':datetime.now(timezone.utc).date().isoformat(),'rainfall_3d':rainfall3d,'rainfall_3d_p90':p90,'swvl1':swvl1,'calendar_month_soil_median':month_median,'elevated_risk_flag':int(threshold_flag),'historical_cache':'farnorth_locality_risk_cache.parquet','runoff_mm':runoff_latest,'sub_surface_runoff_mm':ssro_latest,'runoff_latest_date':runoff_date,'runoff_data_source':'ERA5-Land raw runoff (ro) and sub-surface runoff (ssro), nearest grid cell, daily accumulation in mm','drainage_density_km_per_km2':drainage_density,'drainage_density_data_source':'HydroRIVERS total river-line length within the HydroBASINS level-6 basin divided by basin area (km/km²)','river_discharge_m3s':disch_latest,'river_discharge_status':disch_status,'river_discharge_source':disch_source,'radar_nowcast':{'intensity_0_100':radar_intensity,'precipitation_mmhr':radar_mmhr,'storm_active':radar_storm_active,'source':radar_info.get('source'),'status':radar_info.get('status'),'latest_frame_ts':radar_info.get('latest_frame_ts')},'sar_inundation':sar_info},'forecast_72h':fc,'historical_context':hist,'last_model_update':datetime.now(timezone.utc).isoformat(),'model_type':active_model_type}
+    result={'locality':name,'coordinates':{'lat':lat,'lon':lon},'grid_references':{'era5':f'{float(cache.era_lat):.3f},{float(cache.era_lon):.3f}','glofas':cache.glofas_cell_reference},'provider_status':provider_status,'risk_level':risk_level,'estimated_risk_percent':blended_risk,'ml_probability':ml_prob,'ml_risk_percent':ml_risk_percent,'heuristic_risk_percent':estimated,'estimated_risk_components':{'susceptibility_score':static,'threshold_signal':threshold,'nearby_verified_event_density':density,'ml_calibrated_probability':ml_prob,'radar_intensity_nowcast':radar_intensity,'sar_inundation_fraction':sar_fraction,'sar_risk_boost':sar_risk_boost,'weights':{'heuristic_susceptibility_blend':0.50,'calibrated_ml_blend':0.50} if ml_risk_percent is not None else {'susceptibility':.60,'threshold':.25,'event_density':.15}},'confidence_score':confidence,'confidence_components':{'grid_match_quality':grid,'dem_slope_completeness':completeness,'nearby_verified_event_count':event_count,'nearby_verified_event_density':density,'forecast_data_freshness':freshness,'radar_nowcast_available':radar_info.get('status')=='available','sar_telemetry_available':sar_info.get('status')=='available','sar_inundation_fraction':sar_fraction},'nearby_verified_event_density':density,'current_conditions':{'date':datetime.now(timezone.utc).date().isoformat(),'rainfall_3d':rainfall3d,'rainfall_3d_p90':p90,'swvl1':swvl1,'calendar_month_soil_median':month_median,'elevated_risk_flag':int(threshold_flag),'historical_cache':'farnorth_locality_risk_cache.parquet','runoff_mm':runoff_latest,'sub_surface_runoff_mm':ssro_latest,'runoff_latest_date':runoff_date,'runoff_status':runoff_status,'runoff_data_source':runoff_source,'drainage_density_km_per_km2':drainage_density,'drainage_density_data_source':'HydroRIVERS total river-line length within the HydroBASINS level-6 basin divided by basin area (km/km²)','river_discharge_m3s':disch_latest,'river_discharge_status':disch_status,'river_discharge_source':disch_source,'radar_nowcast':{'intensity_0_100':radar_intensity,'precipitation_mmhr':radar_mmhr,'storm_active':radar_storm_active,'source':radar_info.get('source'),'status':radar_info.get('status'),'latest_frame_ts':radar_info.get('latest_frame_ts')},'sar_inundation':sar_info},'forecast_72h':fc,'historical_context':hist,'last_model_update':datetime.now(timezone.utc).isoformat(),'model_type':active_model_type}
     result['elevation_m'] = float(row.elevation_m) if pd.notna(row.get('elevation_m')) else None
     result['river_distance_m'] = float(row.river_distance_m) if pd.notna(row.get('river_distance_m')) else None
     return json.loads(json.dumps(result, default=lambda o: o.item() if hasattr(o, 'item') else str(o)))
+
+def get_locality_risk(locality_name_or_lat_lon):
+    """Return validated environmental observations and a safe prediction decision.
+
+    This replacement intentionally supersedes the legacy hybrid scorer above.
+    It never manufactures rainfall windows, discharge lags, radar values, SAR
+    percentages, or ML defaults. It selects the separately trained partial
+    profile only when its exact local weather/GloFAS/terrain schema is valid.
+    """
+    row = _resolve(locality_name_or_lat_lon)
+    name = row['name']
+    cache = _risk_cache().loc[name]
+    lat, lon = float(row.lat), float(row.lon)
+    month = datetime.now(timezone.utc).month
+    p90 = float(cache.rainfall_3d_p90)
+    month_median = cache.get(f'soil_median_m{month:02d}')
+    hydro, runoff_table = _hydrology_cache()
+    hrow = hydro.loc[name] if name in hydro.index else None
+    rrow = runoff_table.loc[name] if name in runoff_table.index else None
+    # Select the actual locality/date record from the daily ERA5-Land-derived
+    # archive. The summary table is only an availability fallback for a
+    # damaged/missing daily file; neither path is ever labelled current.
+    archive = _historical_runoff_for_locality(name)
+    if archive is None:
+        runoff_value = rrow.get('runoff_mm_latest') if rrow is not None else None
+        runoff_date = rrow.get('runoff_latest_date') if rrow is not None else None
+        archive = ({'value': float(runoff_value), 'date': str(runoff_date), 'dataset': 'farnorth_runoff_summary.parquet'}
+                   if pd.notna(runoff_value) and pd.notna(runoff_date) else None)
+    hydrological_context = {
+        'basin_id': hrow.get('basin_id') if hrow is not None else None,
+        'glofas_cell_reference': cache.get('glofas_cell_reference'),
+        'river_distance_m': float(row.river_distance_m) if pd.notna(row.get('river_distance_m')) else None,
+    }
+    environment = EnvironmentalOrchestrator().collect(lat, lon, archive, hydrological_context)
+    observations = environment['objects']
+    discharge_series = environment['discharge_series']
+    rainfall = observations['precipitation_3d']
+    soil = observations['soil_moisture_0_to_7cm']
+    discharge = observations['river_discharge']
+    runoff = observations['runoff']
+    rainfall3d = rainfall.value if rainfall.is_valid else None
+    swvl1 = soil.value if soil.is_valid else None
+    discharge_value = discharge.value if discharge.is_valid else None
+    drainage_density = hrow.get('drainage_density_km_per_km2') if hrow is not None else None
+    drainage_density = float(drainage_density) if pd.notna(drainage_density) else None
+    threshold_flag = (int(rainfall3d > p90 and swvl1 > float(month_median))
+                      if rainfall3d is not None and swvl1 is not None and month_median is not None else None)
+    # Terrain fields come from two existing project tables: locality cache for
+    # elevation/slope and HydroBASINS-derived hydrology for basin id.
+    terrain_ready = (
+        pd.notna(row.get('elevation_m')) and pd.notna(row.get('slope_deg'))
+        and hrow is not None and pd.notna(hrow.get('basin_id'))
+    )
+    # Production previously fabricated 7/14-day rain and GloFAS lag features.
+    # They remain unavailable until a source-consistent feature builder is
+    # validated against the training pipeline.
+    full_eligibility = assess_model_eligibility(
+        observations, terrain_ready=terrain_ready,
+        upstream_rainfall_ready=False, discharge_lags_ready=False,
+    )
+    partial_prediction, partial_missing = _partial_live_prediction(
+        observations=observations, discharge_series=discharge_series,
+        row=row, hrow=hrow, rainfall_p90=p90,
+    )
+    eligibility = (
+        {
+            'prediction_status': 'PARTIAL_DATA',
+            'model_profile': partial_prediction['model_version'],
+            'features_used': partial_prediction['features_used'],
+            'features_missing': ['upstream_basin_rainfall_3d', 'upstream_basin_rainfall_7d', 'upstream_basin_rainfall_14d', 'upstream_basin_rainfall_21d', 'upstream_basin_rainfall_30d'],
+            'reason': 'Validated partial-data model selected because local rain windows, soil moisture, GloFAS discharge/lags and terrain are available.',
+        }
+        if partial_prediction else full_eligibility
+    )
+    historical_context = []
+    for _, event in _catalogue().iterrows():
+        event_text = ' '.join([str(event.get('locality_name', '')), str(event.get('division', ''))]).casefold()
+        if norm(name) in norm(event_text) or (pd.notna(row.division) and norm(row.division) in norm(event_text)):
+            historical_context.append({'event_id': event.canonical_event_id, 'start': event.event_start_date,
+                                       'end': event.event_end_date, 'source': event.source_document_url})
+    serialised = environment['observations']
+    good_states = {'REAL_CURRENT', 'REAL_FORECAST', 'REAL_HISTORICAL', 'REAL_RECENT_BUT_NOT_CURRENT'}
+    providers_used = sorted({item['provider_product'] for item in serialised.values() if item['quality'] == 'VALID'})
+    providers_failed = sorted({item['provider_product'] for item in serialised.values() if item['status'] not in good_states})
+    provider_status = {
+        'ready': eligibility['prediction_status'] in {'FULL_PREDICTION', 'PARTIAL_DATA'},
+        'providers': {
+            'openmeteo': {'source': rainfall.provider_product, 'status': rainfall.status, 'quality': rainfall.quality, 'fetched_at': rainfall.retrieved_at, 'error': rainfall.error_message},
+            'glofas': {'source': discharge.provider_product, 'status': discharge.status, 'quality': discharge.quality, 'fetched_at': discharge.retrieved_at, 'error': discharge.error_message},
+            'rainviewer': {'source': observations['radar_visual_layer'].provider_product, 'status': observations['radar_visual_layer'].status, 'quality': observations['radar_visual_layer'].quality, 'fetched_at': observations['radar_visual_layer'].retrieved_at, 'error': observations['radar_visual_layer'].error_message},
+            'era5_runoff': {'source': runoff.provider_product, 'status': runoff.status, 'quality': runoff.quality, 'fetched_at': runoff.retrieved_at, 'error': runoff.error_message},
+            'nasa_opera': {'source': observations['surface_water'].provider_product, 'status': observations['surface_water'].status, 'quality': observations['surface_water'].quality, 'fetched_at': observations['surface_water'].retrieved_at, 'error': observations['surface_water'].error_message},
+        },
+    }
+    provider_status['unavailable'] = [key for key, item in provider_status['providers'].items() if item['status'] not in good_states]
+    result = {
+        'locality': name, 'coordinates': {'lat': lat, 'lon': lon},
+        'grid_references': {'era5': f'{float(cache.era_lat):.3f},{float(cache.era_lon):.3f}', 'glofas': None},
+        'prediction_status': eligibility['prediction_status'],
+        'risk_level': partial_prediction['risk_level'] if partial_prediction else None,
+        'estimated_risk_percent': partial_prediction['risk_score_percent'] if partial_prediction else None,
+        'risk_score': partial_prediction['risk_score_percent'] if partial_prediction else None,
+        'score_unit': 'percent', 'score_label': 'Calibrated risk score',
+        # This partial profile is presented as a calibrated *risk score*, not a
+        # flood probability. Keeping the probability field empty prevents
+        # downstream screens from relabelling the score as a probability.
+        'probability_if_validated': None,
+        'model_name': partial_prediction['model_name'] if partial_prediction else None,
+        'model_version': partial_prediction['model_version'] if partial_prediction else None,
+        'model_eligibility': eligibility,
+        'features_used': eligibility['features_used'], 'features_missing': eligibility['features_missing'],
+        'providers_used': providers_used, 'providers_failed': providers_failed,
+        'provider_status': provider_status, 'provider_health': environment['provider_health'],
+        'environmental_observations': serialised,
+        'data_quality': 'VALIDATED_PARTIAL_DATA' if partial_prediction else 'INSUFFICIENT_FOR_QUANTITATIVE_PREDICTION',
+        'data_quality_note': ('Validated partial-data model using current local rain windows, soil moisture, discharge history and terrain. Radar and SAR are supporting sources, not model features; the training/runtime source transition remains disclosed in the model provenance.' if partial_prediction else 'No trained model can operate with the currently validated feature set.'),
+        'prediction_timestamp': datetime.now(timezone.utc).isoformat(),
+        'explanation': eligibility.get('reason', 'Validated full-model data available.'),
+        'partial_model_metrics': partial_prediction['metrics'] if partial_prediction else None,
+        'partial_model_source_provenance': partial_prediction['source_provenance'] if partial_prediction else None,
+        'partial_model_unavailable_features': partial_missing if not partial_prediction else [],
+        'current_conditions': {
+            'date': datetime.now(timezone.utc).date().isoformat(), 'rainfall_3d': rainfall3d,
+            'rainfall_3d_p90': p90, 'swvl1': swvl1, 'calendar_month_soil_median': month_median,
+            'elevated_risk_flag': threshold_flag,
+            'runoff_mm': runoff.value if runoff.value is not None and runoff.status in {'REAL_CURRENT', 'REAL_FORECAST', 'REAL_HISTORICAL', 'STALE_DATA'} else None,
+            'runoff_latest_date': runoff.valid_time,
+            'runoff_status': runoff.status, 'runoff_data_source': runoff.provider_product,
+            'drainage_density_km_per_km2': drainage_density,
+            'drainage_density_data_source': 'HydroRIVERS total river-line length within HydroBASINS level-6 basin divided by basin area',
+            'river_discharge_m3s': discharge_value, 'river_discharge_status': discharge.status,
+            'river_discharge_source': discharge.provider_product,
+            'radar_nowcast': {'intensity_0_100': None, 'precipitation_mmhr': None, 'storm_active': None,
+                              'source': observations['radar_visual_layer'].provider_product,
+                              'status': observations['radar_visual_layer'].status,
+                              'latest_frame_ts': observations['radar_visual_layer'].valid_time},
+            'sar_inundation': {'water_percentage': None, 'water_detected': None,
+                               'status': observations['surface_water'].status,
+                               'source': observations['surface_water'].provider_product,
+                               'error': observations['surface_water'].error_message},
+        },
+        'historical_context': historical_context,
+        'elevation_m': float(row.elevation_m) if pd.notna(row.get('elevation_m')) else None,
+        'river_distance_m': float(row.river_distance_m) if pd.notna(row.get('river_distance_m')) else None,
+    }
+    result['audit_record_persisted'] = persist_observation_audit(
+        locality=name, latitude=lat, longitude=lon, observations=serialised, eligibility=eligibility,
+    )
+    return json.loads(json.dumps(result, default=lambda value: value.item() if hasattr(value, 'item') else str(value)))
+
 
 def get_locality_risk_classifier(locality_name_or_lat_lon, date_value):
     """Return the secondary exploratory classifier signal for one locality/day.

@@ -2,6 +2,7 @@ import type {
     AppConfig,
 } from '@/types';
 import { refreshTokenIfNeeded } from './auth';
+import { getSession } from './session';
 
 // Base configuration
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -10,8 +11,10 @@ const API_BASE = `${BASE_URL}/api`;
 const getIdentityHeaders = async (): Promise<Record<string, string>> => {
     const headers: Record<string, string> = {};
     try {
-        const user = JSON.parse(localStorage.getItem('aquaguard_user') || 'null');
-        const userId = user && (user.username || user.name || user.email) ? String(user.username || user.email || user.name).trim() : '';
+        const user = getSession();
+        const userId = user?.user_id || user?.username || user?.email
+            ? String(user.user_id || user.username || user.email).trim()
+            : '';
         if (userId) {
             headers['X-User-Id'] = userId;
             headers['X-User-Email'] = userId;
@@ -156,11 +159,12 @@ export interface UserProfile {
 
 export interface UserPredictionRecord {
     id: number;
+    assessment_id: number | null;
     user_id: string;
     locality: string;
     risk_level: string;
     estimated_risk_percent: number;
-    confidence_score: number;
+    confidence_score: number | null;
     forecast_period: string;
     details: Record<string, any>;
     created_at: string;
@@ -180,11 +184,13 @@ export const userPredictionsApi = {
         confidence_score?: number;
         forecast_period?: string;
         details?: Record<string, any>;
-    }): Promise<{ status: string; prediction: UserPredictionRecord }> =>
+    }): Promise<{ status: string; assessment_id: number; prediction_id: number; prediction: UserPredictionRecord }> =>
         request('/my-predictions', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
+    getAssessment: (assessmentId: number): Promise<{ assessment: Record<string, any>; prediction: UserPredictionRecord }> =>
+        request(`/my-assessments/${assessmentId}`),
 };
 
 // =============================================================================

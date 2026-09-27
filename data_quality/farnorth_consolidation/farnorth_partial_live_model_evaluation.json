@@ -1,0 +1,49 @@
+{
+  "features": [
+    "rainfall_1d",
+    "rainfall_3d",
+    "rainfall_7d",
+    "rainfall_14d",
+    "rainfall_anomaly",
+    "swvl1",
+    "discharge_m3s",
+    "discharge_lag1",
+    "discharge_lag3",
+    "discharge_lag7",
+    "elevation_m",
+    "slope_deg",
+    "basin_id",
+    "season"
+  ],
+  "metrics": {
+    "model_name": "Calibrated_HistGradientBoosting_PartialLive",
+    "chronological_holdout": {
+      "training_end": "2021-12-31",
+      "test_start": "2022-01-01"
+    },
+    "train_rows": 368,
+    "test_rows": 256,
+    "train_positives": 23,
+    "test_positives": 16,
+    "decision_threshold_train_optimal": 0.18,
+    "test_pr_auc": 0.3473,
+    "test_roc_auc": 0.8749,
+    "test_brier_score": 0.0528,
+    "test_ece": 0.0089,
+    "test_precision": 0.3333,
+    "test_recall": 0.3125,
+    "test_f1": 0.3226,
+    "confusion_matrix": [
+      [
+        230,
+        10
+      ],
+      [
+        11,
+        5
+      ]
+    ],
+    "always_no_flood_baseline_pr_auc": 0.0625
+  },
+  "trained_at": "2026-09-27T08:19:32.214738+00:00"
+}

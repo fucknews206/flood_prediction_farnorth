@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 import json
 import logging
+import math
 
 from .base_agent import BaseAgent, AgentInsight, AgentAlert
 from ..settings import settings
@@ -219,7 +220,7 @@ class DataCollectorAgent(BaseAgent):
             lat = basin.get('lat')
             lon = basin.get('lon')
             if lat is None or lon is None:
-                return basin_id, {"discharge_cms": None, "discharge_status": "unavailable", "discharge_source": "no_coords"}
+                return basin_id, {"discharge_cms": None, "discharge_status": "OUTSIDE_COVERAGE", "discharge_source": "no_coords"}
 
             url = "https://flood-api.open-meteo.com/v1/flood"
             params = {
@@ -235,15 +236,19 @@ class DataCollectorAgent(BaseAgent):
                     async with session.get(url, params=params, headers={"User-Agent": "AquaGuard-Cameroon/1.0"}) as resp:
                         if resp.status != 200:
                             logger.warning(f"GloFAS Flood API returned {resp.status} for basin {basin_id}")
-                            return basin_id, {"discharge_cms": None, "discharge_status": "unavailable", "discharge_source": "open-meteo-glofas"}
+                            state = "RATE_LIMITED" if resp.status == 429 else "AUTHENTICATION_ERROR" if resp.status in (401, 403) else "PROVIDER_ERROR"
+                            return basin_id, {"discharge_cms": None, "discharge_status": state, "discharge_source": "open-meteo-glofas", "http_status": resp.status}
                         raw = await resp.json()
                 daily = raw.get("daily", {})
                 times = daily.get("time", [])
                 vals  = daily.get("river_discharge", [])
-                by_date = {t: float(v) for t, v in zip(times, vals) if v is not None}
+                by_date = {t: float(v) for t, v in zip(times, vals) if isinstance(v, (int, float)) and math.isfinite(float(v)) and float(v) >= 0}
                 today = datetime.now(timezone.utc).date().isoformat()
-                latest = by_date.get(today) or (list(by_date.values())[-1] if by_date else None)
-                status = "available" if latest is not None else "unavailable"
+                # A real zero is a valid hydrological output.  Do not use
+                # boolean fallback selection here: it turns today's 0.0 into
+                # a different date or into an artificial unavailable state.
+                latest = by_date[today] if today in by_date else (list(by_date.values())[-1] if by_date else None)
+                status = "REAL_CURRENT" if latest is not None else "NO_DATA"
                 return basin_id, {
                     "discharge_cms": latest,
                     "discharge_status": status,
@@ -251,8 +256,9 @@ class DataCollectorAgent(BaseAgent):
                     "discharge_by_date": by_date,
                 }
             except Exception as exc:
+                state = "TIMEOUT" if isinstance(exc, (asyncio.TimeoutError, TimeoutError)) else "PROVIDER_ERROR"
                 logger.warning(f"GloFAS Flood API error for basin {basin_id}: {exc}")
-                return basin_id, {"discharge_cms": None, "discharge_status": "unavailable", "discharge_source": "open-meteo-glofas", "error": str(exc)}
+                return basin_id, {"discharge_cms": None, "discharge_status": state, "discharge_source": "open-meteo-glofas", "error": str(exc)}
 
         tasks = [fetch_one(b) for b in basins]
         raw_results = await asyncio.gather(*tasks)

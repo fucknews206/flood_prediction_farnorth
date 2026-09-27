@@ -40,6 +40,7 @@ import { MapContainer, TileLayer, Marker, Tooltip, GeoJSON, useMap } from 'react
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { farNorthRiskApi, geoApi, userPredictionsApi, aiApi, type GeoJSONFeatureCollection } from '@/lib/api'
+import { assessmentDraftKey, getSession } from '@/lib/session'
 
 // Custom Leaflet Pin Icon
 const customIcon = new L.Icon({
@@ -88,36 +89,34 @@ function MapControls() {
 //   https://tilecache.rainviewer.com/v2/radar/{timestamp}/256/{z}/{x}/{y}/2/1_1.png
 // The manifest endpoint returns the latest 5 past frames; we use the last one.
 // No API key required. Tiles update every ~2 minutes.
-const RAINVIEWER_TILE_URL =
-  'https://tilecache.rainviewer.com/v2/radar/{radarTs}/256/{z}/{x}/{y}/2/1_1.png'
-
 function RainViewerLayer() {
-  const [radarTs, setRadarTs] = useState<number | null>(null)
+  const [radarBase, setRadarBase] = useState<string | null>(null)
+  const setLatestFrame = (manifest: any) => {
+    const past = manifest?.radar?.past ?? []
+    const frame = past[past.length - 1]
+    if (!frame) return
+    const host = String(manifest?.host || 'https://tilecache.rainviewer.com').replace(/\/$/, '')
+    setRadarBase(`${host}${frame.path || `/v2/radar/${frame.time}`}`)
+  }
   useEffect(() => {
     fetch('https://api.rainviewer.com/public/weather-maps.json')
       .then(r => r.json())
-      .then(m => {
-        const past = m?.radar?.past ?? []
-        if (past.length) setRadarTs(past[past.length - 1].time)
-      })
+      .then(setLatestFrame)
       .catch(() => {/* silently skip */})
     // Refresh every 2 minutes to pick up the latest frame
     const id = setInterval(() => {
       fetch('https://api.rainviewer.com/public/weather-maps.json')
         .then(r => r.json())
-        .then(m => {
-          const past = m?.radar?.past ?? []
-          if (past.length) setRadarTs(past[past.length - 1].time)
-        })
+        .then(setLatestFrame)
         .catch(() => {})
     }, 120_000)
     return () => clearInterval(id)
   }, [])
-  if (!radarTs) return null
+  if (!radarBase) return null
   return (
     <TileLayer
-      key={`rv-${radarTs}`}
-      url={RAINVIEWER_TILE_URL.replace('{radarTs}', String(radarTs))}
+      key={`rv-${radarBase}`}
+      url={`${radarBase}/256/{z}/{x}/{y}/2/1_1.png`}
       attribution='&copy; <a href="https://rainviewer.com">RainViewer</a> live radar'
       opacity={0.55}
       zIndex={350}
@@ -259,14 +258,16 @@ type EnvironmentalContextProps = {
 }
 
 function EnvironmentalContextStep({ area, city, region, onEdit, onBack, onContinue, risk, forecast, coverageDisclosure, isLoading = false, loadingError = null, mode = 'locality', divisionResult = null }: EnvironmentalContextProps) {
+  const hasPartialRisk = risk?.prediction_status === 'PARTIAL_DATA'
+  const scoreLabel = risk?.score_label || 'Flood Risk Estimate'
   const sources = [
-    ['Satellite Radar (RainViewer nowcast)', Activity],
-    ['SAR Flood Inundation (NASA OPERA DSWx-S1)', Radar],
-    ['Weather Forecast (Open-Meteo / ERA5)', CloudRain],
-    ['River Discharge (GloFAS v4 Flood API)', Waves],
-    ['Historical Flood Records', FileCheck],
-    ['Soil & Terrain Data (ERA5-Land / DEM)', Mountain],
-    ['Drainage Network (HydroRIVERS)', TreePine],
+    ['Satellite Radar (RainViewer nowcast)', Activity, 'rainviewer'],
+    ['SAR Flood Inundation (NASA OPERA DSWx-S1)', Radar, 'nasa_opera'],
+    ['Weather Forecast (Open-Meteo)', CloudRain, 'openmeteo'],
+    ['River Discharge (GloFAS v4 Flood API)', Waves, 'glofas'],
+    ['Surface Runoff (Open-Meteo / ERA5-Land)', Mountain, 'era5_runoff'],
+    ['Historical Flood Records', FileCheck, null],
+    ['Drainage Network (HydroRIVERS)', TreePine, null],
   ]
   const current = risk?.current_conditions || {}
   const divisionMaximum = divisionResult?.risk
@@ -275,6 +276,21 @@ function EnvironmentalContextStep({ area, city, region, onEdit, onBack, onContin
   const liveDischarge = current.river_discharge_m3s ?? forecast?.trajectory?.[0]?.glofas_discharge_m3s
   const liveRainfall = current.rainfall_3d ?? forecast?.trajectory?.[0]?.local_rainfall_3d_mm
   const liveSoil = current.swvl1 ?? forecast?.trajectory?.[0]?.soil_moisture
+  const runoffDisplay = current.runoff_mm == null ? 'Unavailable' : Math.abs(Number(current.runoff_mm)) < 0.001 ? Number(current.runoff_mm).toExponential(2) : Number(current.runoff_mm).toFixed(4)
+  const providerStatus = risk?.provider_status?.providers || {}
+  const sourceStatus = (key: string) => providerStatus[key]?.status || (isLoading ? 'loading' : 'unavailable')
+  const sourceStatusLabel = (key: string) => {
+    const status = sourceStatus(key)
+    if (providerStatus[key]?.quality === 'SPATIAL_VALIDATION_PENDING') return 'Spatial validation pending'
+    if (providerStatus[key]?.quality === 'VISUAL_ONLY') return 'Visual layer only'
+    if (status === 'available' || status === 'REAL_CURRENT') return 'Current'
+    if (status === 'REAL_FORECAST') return 'Forecast'
+    if (status === 'historical' || status === 'REAL_HISTORICAL') return 'Historical'
+    if (status === 'REAL_RECENT_BUT_NOT_CURRENT') return 'Recent / visual only'
+    if (status === 'STALE_DATA') return 'Stale — context only'
+    if (status === 'loading') return 'Checking'
+    return 'Unavailable'
+  }
 
   const renderMetricValue = (val: any, unit: string) => {
     if (isLoading) {
@@ -299,10 +315,10 @@ function EnvironmentalContextStep({ area, city, region, onEdit, onBack, onContin
   const metrics = [
     ['Rainfall (3-day forecast)', liveRainfall == null ? 'Unavailable' : Number(liveRainfall).toFixed(1), 'mm', 'Open-Meteo', CloudRain, 'text-blue-600'],
     ['Soil Saturation', liveSoil == null ? 'Unavailable' : `${(Number(liveSoil) * 100).toFixed(1)}`, '%', 'local historical signal', Droplet, 'text-blue-600'],
-    ['GloFAS Discharge', liveDischarge == null ? 'Unavailable' : Number(liveDischarge).toFixed(2), 'm³/s', 'GloFAS v4 Flood API', Waves, 'text-blue-600'],
-    ['Radar Intensity', radarNowcast?.intensity_0_100 == null ? 'Unavailable' : `${radarNowcast.intensity_0_100}`, radarNowcast?.intensity_0_100 == null ? '' : '/100', radarNowcast?.storm_active ? '⚡ Active storm detected' : 'RainViewer live nowcast', Activity, radarNowcast?.storm_active ? 'text-red-600' : (radarNowcast?.intensity_0_100 != null ? 'text-blue-600' : 'text-slate-500')],
+    ['GloFAS Discharge', liveDischarge == null ? 'Unavailable' : Number(liveDischarge).toFixed(2), 'm³/s', providerStatus.glofas?.quality === 'SPATIAL_VALIDATION_PENDING' ? 'spatial cell validation pending' : 'GloFAS v4 Flood API', Waves, liveDischarge == null ? 'text-slate-500' : 'text-blue-600'],
+    ['Radar Density', radarNowcast?.intensity_0_100 == null ? 'Unavailable' : `${radarNowcast.intensity_0_100}`, radarNowcast?.intensity_0_100 == null ? '' : '/100', radarNowcast?.storm_active ? '⚡ Active storm detected' : 'RainViewer live radar', Activity, radarNowcast?.storm_active ? 'text-red-600' : (radarNowcast?.intensity_0_100 != null ? 'text-blue-600' : 'text-slate-500')],
     ['SAR Inundation', sarInundation?.water_percentage == null ? 'Unavailable' : `${sarInundation.water_percentage}`, sarInundation?.water_percentage == null ? '' : '%', sarInundation?.water_detected ? '🌊 Surface water detected' : 'NASA OPERA DSWx-S1', Radar, sarInundation?.water_detected ? 'text-amber-600' : (sarInundation?.water_percentage != null ? 'text-cyan-600' : 'text-slate-500')],
-    ['Surface Runoff', current.runoff_mm == null ? 'Unavailable' : Number(current.runoff_mm).toFixed(2), current.runoff_mm == null ? '' : 'mm/day', current.runoff_mm == null ? 'not available' : `ERA5-Land · ${String(current.runoff_latest_date || 'latest')}`, Mountain, current.runoff_mm == null ? 'text-slate-500' : 'text-blue-600'],
+    ['Surface Runoff', runoffDisplay, current.runoff_mm == null ? '' : 'mm', current.runoff_mm == null ? 'unavailable' : current.runoff_status === 'REAL_HISTORICAL' ? `ERA5-Land historical/reference · ${String(current.runoff_latest_date || 'date unavailable').slice(0, 10)}` : 'Open-Meteo live model', Mountain, current.runoff_mm == null ? 'text-slate-500' : current.runoff_status === 'REAL_HISTORICAL' ? 'text-amber-600' : 'text-blue-600'],
     ['Drainage Density', current.drainage_density_km_per_km2 == null ? 'Unavailable' : Number(current.drainage_density_km_per_km2).toFixed(4), current.drainage_density_km_per_km2 == null ? '' : 'km/km²', current.drainage_density_km_per_km2 == null ? 'not available' : 'HydroRIVERS / basin area', Gauge, current.drainage_density_km_per_km2 == null ? 'text-slate-500' : 'text-blue-600'],
   ] as const
 
@@ -317,7 +333,7 @@ function EnvironmentalContextStep({ area, city, region, onEdit, onBack, onContin
             {[[Compass, 'Coordinates', mode === 'division' ? 'Division-level' : (risk?.coordinates ? `${Number(risk.coordinates.lat).toFixed(4)}° N, ${Number(risk.coordinates.lon).toFixed(4)}° E` : (isLoading ? 'Locating...' : 'Loaded after assessment'))], [Mountain, 'Elevation', mode === 'division' ? 'Division-level' : risk?.elevation_m == null ? (isLoading ? 'Loading...' : 'Loaded after assessment') : `${Number(risk.elevation_m).toFixed(1)} m`], [Waves, 'Nearest major waterway', mode === 'division' ? 'Division-level' : risk?.river_distance_m == null ? (isLoading ? 'Loading...' : 'Loaded after assessment') : `Approximately ${Number(risk.river_distance_m).toFixed(0)} m`]].map(([Icon, label, value]) => { const I = Icon as typeof Compass; return <div key={label as string} className="flex items-center justify-between py-3"><span className="flex items-center gap-2 text-slate-500"><I className="h-3.5 w-3.5" />{label as string}</span><b className="text-right text-slate-700">{value as string}</b></div> })}
           </div>
           <h3 className="mt-5 text-sm font-extrabold text-[#102552]">Data Sources</h3>
-          <div className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-100 px-3">{sources.map(([label, Icon]) => { const I = Icon as typeof Layers; return <div key={String(label)} className="flex items-center gap-2 py-3 text-xs"><I className="h-4 w-4 text-blue-600" /><span className="flex-1 font-medium text-slate-600">{String(label)}</span><span className="h-2 w-2 rounded-full bg-emerald-400" /><span className="text-[10px] text-slate-500">Active</span><ArrowRight className="h-3 w-3 text-slate-400" /></div> })}</div>
+          <div className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-100 px-3">{sources.map(([label, Icon, provider]) => { const I = Icon as typeof Layers; const providerKey = typeof provider === 'string' ? provider : null; const status = providerKey ? sourceStatusLabel(providerKey) : 'Available'; const dot = status === 'Current' || status === 'Available' ? 'bg-emerald-400' : status === 'Forecast' || status === 'Historical' || status === 'Checking' || status === 'Recent / visual only' || status === 'Stale — context only' ? 'bg-amber-400' : 'bg-slate-300'; return <div key={String(label)} className="flex items-center gap-2 py-3 text-xs"><I className="h-4 w-4 text-blue-600" /><span className="flex-1 font-medium text-slate-600">{String(label)}</span><span className={`h-2 w-2 rounded-full ${dot}`} /><span className="text-[10px] text-slate-500">{status}</span><ArrowRight className="h-3 w-3 text-slate-400" /></div> })}</div>
           <div className="mt-5 rounded-lg border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-4"><div className="flex gap-2"><Info className="h-5 w-5 shrink-0 text-blue-600" /><div><p className="text-xs font-bold text-blue-900">About the Analysis</p><p className="mt-2 text-[11px] leading-relaxed text-slate-600">Our AI model analyzes multiple environmental factors to estimate flood probability and potential impact.</p></div></div></div>
         </aside>
 
@@ -325,7 +341,7 @@ function EnvironmentalContextStep({ area, city, region, onEdit, onBack, onContin
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-base font-extrabold text-[#102552]">{mode === 'division' ? `Division Analysis: ${city}` : 'Environmental Analysis Summary'}</h2><p className="mt-1 text-xs text-slate-500">{mode === 'division' ? (divisionResult?.coverage_note || 'Maximum risk across covered localities') : 'Analysis based on the latest available data'}</p>{mode === 'division' ? (divisionMaximum ? <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-bold text-amber-900">Maximum covered-locality risk</p><p className="mt-1 text-2xl font-black text-[#122653]">{Number(divisionMaximum.estimated_risk_percent).toFixed(1)}%</p><p className="text-xs font-semibold text-amber-800">{divisionMaximum.locality} · {divisionMaximum.risk_level}</p></div> : <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-800">No model-covered localities are available for this division, so no division risk is displayed.</div>) : <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">{metrics.map(([label, value, unit, severity, Icon, color]) => { const I = Icon as typeof CloudRain; return <div key={String(label)} className="min-h-[118px] rounded-xl border border-slate-100 p-3 shadow-sm bg-white"><div className="flex gap-2"><span className="grid h-8 w-8 place-items-center rounded-full bg-blue-50"><I className="h-4 w-4 text-blue-600" /></span><span className="text-[10px] font-semibold leading-tight text-slate-500">{String(label)}</span></div><p className="mt-3 text-lg font-extrabold text-[#122653]">{renderMetricValue(value, unit)}</p><p className={`mt-2 text-xs font-medium ${color}`}>{String(severity)} <span className="ml-1">↗</span></p></div> })}</div>}</div>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.08fr_.92fr]">
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h3 className="text-sm font-extrabold text-[#102552]">Forecast Rainfall</h3><p className="mt-3 text-[10px] text-slate-500">Open-Meteo daily totals (mm)</p></div><span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">Real forecast</span></div><div className="mt-2 flex h-40 items-end gap-3 border-b border-slate-200 px-2">{(forecast?.trajectory || []).map((point: any) => { const maxRain = Math.max(1, ...(forecast?.trajectory || []).map((p: any) => Number(p.local_rainfall_1d_mm || 0))); const height = Math.max(4, Number(point.local_rainfall_1d_mm || 0) / maxRain * 120); return <div key={point.date} className="flex h-32 flex-1 flex-col items-center justify-end gap-2"><span className="block w-full rounded-t bg-[#1353c9]" style={{ height: `${height}px` }} /><span className="whitespace-nowrap text-[10px] font-semibold text-slate-500">{String(point.date).slice(5)}</span></div>})}</div></div>
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><h3 className="text-sm font-extrabold text-[#102552]">Flood Risk Estimate</h3><span className="rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">Option B · operational</span></div><div className="relative mx-auto mt-4 h-32 max-w-[290px]"><div className="absolute inset-0 grid place-items-center"><div className="text-center"><p className="text-4xl font-black text-blue-700">{risk?.estimated_risk_percent == null ? '—' : `${Number(risk.estimated_risk_percent).toFixed(1)}%`}</p><p className="mt-1 text-xs font-bold text-[#142650]">{risk?.risk_level || 'Unavailable'} risk</p><p className="mt-1 text-[10px] text-slate-500">Confidence: {risk?.confidence_score == null ? '—' : `${Number(risk.confidence_score).toFixed(1)}%`}</p></div></div></div><div className="mt-3 rounded-lg bg-blue-50 px-5 py-3 text-center text-[11px] font-medium text-blue-800">Rules-based formula is the primary estimate. Exploratory classifier output is secondary research only.</div></div>
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><h3 className="text-sm font-extrabold text-[#102552]">{scoreLabel}</h3><span className="rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">{hasPartialRisk ? 'Validated partial data' : 'Validated-input gate'}</span></div><div className="relative mx-auto mt-4 h-32 max-w-[290px]"><div className="absolute inset-0 grid place-items-center"><div className="text-center"><p className="text-4xl font-black text-blue-700">{risk?.estimated_risk_percent == null ? '—' : `${Number(risk.estimated_risk_percent).toFixed(1)}%`}</p><p className="mt-1 text-xs font-bold text-[#142650]">{risk?.risk_level || 'Unavailable'} risk</p><p className="mt-1 text-[10px] text-slate-500">{hasPartialRisk ? 'Current validated core inputs' : `Confidence: ${risk?.confidence_score == null ? '—' : `${Number(risk.confidence_score).toFixed(1)}%`}`}</p></div></div></div><div className="mt-3 rounded-lg bg-blue-50 px-5 py-3 text-center text-[11px] font-medium text-blue-800">{hasPartialRisk ? 'Current rain, soil, discharge history and terrain support this calibrated score. Radar and SAR remain optional supporting evidence.' : risk?.prediction_status === 'INSUFFICIENT_DATA' ? 'Quantitative prediction withheld until the validated model inputs are available.' : 'Only validated model inputs may produce a quantitative estimate.'}</div></div>
           </div>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.08fr_.92fr]">
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-sm font-extrabold text-[#102552]">Key Environmental Insights</h3><div className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-100 px-3">{[[`Operational risk level: ${risk?.risk_level || 'unavailable'}.`, ShieldCheck], [`3-day rainfall signal: ${current.rainfall_3d == null ? 'unavailable' : `${Number(current.rainfall_3d).toFixed(1)} mm`}.`, CloudRain], [`Soil moisture: ${current.swvl1 == null ? 'unavailable' : `${(Number(current.swvl1) * 100).toFixed(1)}%`}.`, Droplet], [`Surface runoff: ${current.runoff_mm == null ? 'unavailable' : `${Number(current.runoff_mm).toFixed(2)} mm/day`}.`, Activity], [`Drainage density: ${current.drainage_density_km_per_km2 == null ? 'unavailable' : `${Number(current.drainage_density_km_per_km2).toFixed(4)} km/km²`}.`, Gauge]].map(([text, Icon]) => { const I = Icon as typeof CloudRain; return <div key={String(text)} className="flex gap-3 py-2.5 text-[11px] text-slate-600"><I className="h-4 w-4 shrink-0 text-blue-600" />{String(text)}</div> })}</div><div className="mt-3 flex gap-2 rounded-lg bg-blue-50 p-3 text-[11px] text-blue-700"><Info className="h-4 w-4 shrink-0" />Rules-based Option B remains the primary operational estimate.</div></div>
@@ -345,10 +361,9 @@ export default function AssessFloodRiskPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Authenticated user
-  const [user, setUser] = useState<{ name?: string; username?: string; role?: string } | null>(null)
+  const [user, setUser] = useState<{ user_id?: string; name?: string; username?: string; role?: string } | null>(null)
   useEffect(() => {
-    const stored = localStorage.getItem('aquaguard_user')
-    if (stored) { try { setUser(JSON.parse(stored)) } catch {} }
+    setUser(getSession())
   }, [])
   const displayName = user?.name || user?.username || 'Citizen'
   const userGreetingName = displayName.includes('@') ? displayName.split('@')[0] : displayName
@@ -370,7 +385,7 @@ export default function AssessFloodRiskPage() {
   const [predictionMode, setPredictionMode] = useState<'locality' | 'division'>('locality')
   const [division, setDivision] = useState('Logone-et-Chari')
   const [neighborhoodNote, setNeighborhoodNote] = useState('')
-  const initialLocality = searchParams.get('locality') || searchParams.get('city') || 'Blangoua'
+  const initialLocality = searchParams.get('locality') || searchParams.get('city') || ''
   const [city, setCity] = useState(initialLocality)
   const [specificArea, setSpecificArea] = useState(initialLocality)
   const [suggestions, setSuggestions] = useState<Array<{ name: string; division?: string; covered: boolean; score: number }>>([])
@@ -379,8 +394,20 @@ export default function AssessFloodRiskPage() {
   const [risk, setRisk] = useState<Record<string, any> | null>(null)
   const [forecast, setForecast] = useState<Record<string, any> | null>(null)
   const [divisionResult, setDivisionResult] = useState<Record<string, any> | null>(null)
-  const [loadingAction, setLoadingAction] = useState<'assessment' | 'review' | null>(null)
+  const [loadingAction, setLoadingAction] = useState<'assessment' | 'review' | 'saving' | null>(null)
   const [loadingError, setLoadingError] = useState<string | null>(null)
+  const session = getSession()
+  const draftKey = assessmentDraftKey(session)
+  const [assessmentDraftId, setAssessmentDraftId] = useState(() => window.crypto?.randomUUID?.() || `draft-${Date.now()}`)
+
+  const resetAssessmentForLocality = (locality: string) => {
+    // Changing locality starts a distinct assessment, never a renamed prior
+    // result. Authentication is deliberately untouched.
+    window.sessionStorage.removeItem(draftKey)
+    setAssessmentDraftId(window.crypto?.randomUUID?.() || `draft-${Date.now()}`)
+    setCity(locality); setSpecificArea(locality); setRisk(null); setForecast(null)
+    setDivisionResult(null); setCoverageDisclosure(null); setLoadingError(null)
+  }
 
   const changeStep = (newStep: number) => {
     setStep(newStep)
@@ -388,10 +415,37 @@ export default function AssessFloodRiskPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // Auto-fetch if loaded directly on step 2 with no cached risk
+  // Restore only the owner-scoped draft on refresh.  A fresh assessment URL
+  // explicitly bypasses drafts so an older result cannot contaminate it.
   useEffect(() => {
-    if (step === 2 && !risk && loadingAction === null) {
-      handleAssessmentContinue()
+    if (searchParams.get('new') === '1') {
+      window.sessionStorage.removeItem(draftKey)
+      return
+    }
+    try {
+      const draft = JSON.parse(window.sessionStorage.getItem(draftKey) || 'null')
+      if (draft?.draftId && draft.locality && draft.risk && draft.locality === initialLocality) {
+        setAssessmentDraftId(draft.draftId); setCity(draft.locality); setSpecificArea(draft.locality)
+        setRisk(draft.risk); setForecast(draft.forecast || null); setDivisionResult(draft.divisionResult || null)
+      }
+    } catch { window.sessionStorage.removeItem(draftKey) }
+  // This is intentionally run once per mounted assessment flow.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!risk) return
+    window.sessionStorage.setItem(draftKey, JSON.stringify({
+      draftId: assessmentDraftId, locality: city || specificArea, risk, forecast, divisionResult,
+      savedAt: new Date().toISOString(),
+    }))
+  }, [assessmentDraftId, city, specificArea, risk, forecast, divisionResult, draftKey])
+
+  // A direct Step 2/3 URL must retrieve fresh data when no same-owner draft is
+  // available; it must never show a previous prediction as this assessment.
+  useEffect(() => {
+    if (step >= 2 && !risk && loadingAction === null && city.trim()) {
+      assessSelectedLocality().catch(() => undefined)
     }
   }, [step, risk, loadingAction])
 
@@ -406,50 +460,6 @@ export default function AssessFloodRiskPage() {
     return () => window.clearTimeout(timer)
   }, [city, isSuggestionMenuOpen])
 
-  // Fallback risk profiles for well-known Far North localities (used when the
-  // live API is unavailable due to missing dependencies like PIL).
-  const FALLBACK_RISK_PROFILES: Record<string, { risk_level: string; estimated_risk_percent: number; confidence_score: number }> = {
-    'Kousséri': { risk_level: 'High', estimated_risk_percent: 68.5, confidence_score: 72 },
-    'Kousseri': { risk_level: 'High', estimated_risk_percent: 68.5, confidence_score: 72 },
-    'Blangoua': { risk_level: 'High', estimated_risk_percent: 74.2, confidence_score: 70 },
-    'Zina': { risk_level: 'High', estimated_risk_percent: 71.8, confidence_score: 68 },
-    'Maga': { risk_level: 'Moderate', estimated_risk_percent: 52.3, confidence_score: 75 },
-    'Yagoua': { risk_level: 'Moderate', estimated_risk_percent: 48.6, confidence_score: 74 },
-    'Doukoula': { risk_level: 'Low', estimated_risk_percent: 24.6, confidence_score: 78 },
-    'Maroua': { risk_level: 'Low', estimated_risk_percent: 21.8, confidence_score: 80 },
-    'Mora': { risk_level: 'Low', estimated_risk_percent: 18.5, confidence_score: 76 },
-    'Kaélé': { risk_level: 'Moderate', estimated_risk_percent: 41.2, confidence_score: 71 },
-    'Waza': { risk_level: 'Low', estimated_risk_percent: 22.4, confidence_score: 73 },
-    'Guidiguis': { risk_level: 'Moderate', estimated_risk_percent: 38.7, confidence_score: 69 },
-    'Bogo': { risk_level: 'Low', estimated_risk_percent: 19.2, confidence_score: 74 },
-    'Mokolo': { risk_level: 'Low', estimated_risk_percent: 15.8, confidence_score: 77 },
-  }
-
-  function generateFallbackForecast(locality: string) {
-    const today = new Date()
-    const profile = FALLBACK_RISK_PROFILES[locality] || { risk_level: 'Moderate', estimated_risk_percent: 40, confidence_score: 70 }
-    const isHighRisk = profile.risk_level === 'High'
-    const isMod = profile.risk_level === 'Moderate'
-    const trajectory = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(today); d.setDate(d.getDate() + i)
-      const dateStr = d.toISOString().split('T')[0]
-      const peakDay = isHighRisk ? 2 : isMod ? 3 : 4
-      const rain = i === peakDay ? (isHighRisk ? 18.5 : isMod ? 12.0 : 4.0) :
-        i === peakDay - 1 || i === peakDay + 1 ? (isHighRisk ? 8.0 : isMod ? 5.0 : 1.5) : Math.random() * 1.5
-      const elevated = i === peakDay || (isHighRisk && i === peakDay + 1)
-      return {
-        date: dateStr,
-        local_rainfall_1d_mm: Number(rain.toFixed(1)),
-        local_rainfall_3d_mm: Number((rain * 1.6).toFixed(1)),
-        glofas_discharge_m3s: isHighRisk ? 180 + i * 20 - Math.abs(i - peakDay) * 25 : isMod ? 120 + i * 10 - Math.abs(i - peakDay) * 15 : 70 + i * 5,
-        option_b_threshold_flag: elevated,
-        option_b_risk_level: elevated ? 'Elevated' : 'Low',
-        classifier_probability: elevated ? profile.estimated_risk_percent / 100 + 0.12 : profile.estimated_risk_percent / 100 - 0.05,
-      }
-    })
-    return { trajectory, locality }
-  }
-
   const assessSelectedLocality = async (): Promise<boolean> => {
     try {
       if (predictionMode === 'division') {
@@ -462,32 +472,12 @@ export default function AssessFloodRiskPage() {
           setForecast(null)
           setCoverageDisclosure(result.coverage_note || null)
           return true
-        } catch {
-          // Fallback: Use the first locality in the division
-          const divLocality = division.includes('Logone') ? 'Kousséri' : division.includes('Mayo-D') ? 'Yagoua' :
-            division.includes('Diamar') ? 'Maroua' : division.includes('Mayo-S') ? 'Mora' :
-            division.includes('Mayo-Ts') ? 'Mokolo' : 'Maga'
-          const fp = FALLBACK_RISK_PROFILES[divLocality] || { risk_level: 'Moderate', estimated_risk_percent: 40, confidence_score: 70 }
-          setDivisionResult({ division, coverage_note: 'Based on reference data (live data temporarily unavailable)', risk: { locality: divLocality, ...fp } })
-          setCity(division)
-          setSpecificArea(divLocality)
-          setRisk({
-            locality: divLocality,
-            ...fp,
-            coordinates: { lat: 12.1, lon: 15.0 },
-            current_conditions: {
-              rainfall_3d: 2.8,
-              swvl1: 0.446,
-              runoff_mm: 0.12,
-              drainage_density_km_per_km2: 0.0032,
-              river_discharge_m3s: 130.0,
-              radar_nowcast: { intensity_0_100: 0.0, storm_active: false },
-              sar_inundation: { water_percentage: 10.86, water_detected: true },
-            },
-          })
-          setForecast(generateFallbackForecast(divLocality))
-          setCoverageDisclosure('Reference assessment based on historical data. Live environmental data temporarily unavailable.')
-          return true
+        } catch (error) {
+          setDivisionResult(null)
+          setRisk(null)
+          setForecast(null)
+          setCoverageDisclosure(error instanceof Error ? `Live division assessment unavailable: ${error.message}` : 'Live division assessment is unavailable. No reference values are shown.')
+          return false
         }
       }
       const localityName = city || specificArea
@@ -505,42 +495,23 @@ export default function AssessFloodRiskPage() {
         setSpecificArea(localityName)
       }
       try {
+        // Both endpoints use live provider data.  The forecast endpoint carries
+        // the full seven-day Open-Meteo/GloFAS trajectory used in Step 3.
         const [riskResult, forecastResult] = await Promise.all([
           farNorthRiskApi.assess(resolvedName),
           farNorthRiskApi.forecast(resolvedName),
         ])
+        if (forecastResult.status === 'not_available' || !Array.isArray(forecastResult.trajectory) || !forecastResult.trajectory.length) {
+          throw new Error(forecastResult.message || 'The live forecast provider returned no forecast days.')
+        }
         setRisk(riskResult); setForecast(forecastResult); setDivisionResult(null)
         return true
-      } catch {
-        // Live API unavailable — use reference fallback data
-        const fp = FALLBACK_RISK_PROFILES[resolvedName] || FALLBACK_RISK_PROFILES[localityName]
-          || { risk_level: 'Moderate', estimated_risk_percent: 38.5, confidence_score: 70 }
-        const fallbackRisk = {
-          locality: resolvedName,
-          risk_level: fp.risk_level,
-          estimated_risk_percent: fp.estimated_risk_percent,
-          confidence_score: fp.confidence_score,
-          coordinates: { lat: 12.1364, lon: 15.0557 },
-          current_conditions: {
-            rainfall_3d: 2.8,
-            swvl1: 0.446,
-            runoff_mm: 0.12,
-            drainage_density_km_per_km2: 0.0032,
-            river_discharge_m3s: 130.0,
-            radar_nowcast: { intensity_0_100: 0.0, storm_active: false },
-            sar_inundation: { water_percentage: 12.4, water_detected: true },
-          },
-          rainfall_3d: 2.8,
-          swvl1: 0.446,
-          runoff_mm: 0.12,
-          drainage_density_km_per_km2: 0.0032,
-          data_note: 'Reference assessment — live environmental sensors temporarily unavailable.',
-        }
-        setRisk(fallbackRisk)
-        setForecast(generateFallbackForecast(resolvedName))
+      } catch (error) {
+        setRisk(null)
+        setForecast(null)
         setDivisionResult(null)
-        setCoverageDisclosure('Reference assessment based on historical risk data. Live data is temporarily unavailable due to a backend dependency issue.')
-        return true
+        setCoverageDisclosure(error instanceof Error ? `Live environmental assessment unavailable: ${error.message}` : 'Live environmental assessment is unavailable. No reference values are shown.')
+        return false
       }
     } catch (error) {
       setRisk(null); setForecast(null)
@@ -556,6 +527,7 @@ export default function AssessFloodRiskPage() {
 
   const handleAssessmentContinue = async () => {
     if (loadingAction) return
+    if (predictionMode === 'locality' && !city.trim()) { setLoadingError('Select a locality before continuing.'); return }
     setLoadingAction('assessment'); setLoadingError(null)
     try {
       const ok = await withTimeout(assessSelectedLocality())
@@ -592,7 +564,7 @@ export default function AssessFloodRiskPage() {
   const handleSendChat = async (textToSend?: string) => {
     const query = textToSend || chatInput
     if (!query.trim()) return
-    const userRaw = localStorage.getItem('aquaguard_user')
+    const userRaw = getSession()
     const newMessages = [...aiMessages, { sender: 'user' as const, text: query }]
     setAiMessages(newMessages)
     setChatInput('')
@@ -623,7 +595,9 @@ export default function AssessFloodRiskPage() {
       })
       const reply = res?.response && res.response.trim().length > 0
         ? res.response
-        : `For ${specificArea}, the current risk level is ${risk?.risk_level || 'Moderate'}.`
+        : risk?.risk_level
+          ? `For ${specificArea}, the current risk level is ${risk.risk_level}.`
+          : `A quantitative risk level for ${specificArea} is unavailable until the required validated model inputs are available.`
       setAiMessages((prev) => [...prev, { sender: 'ai', text: reply }])
     } catch {
       setAiMessages((prev) => [
@@ -638,26 +612,49 @@ export default function AssessFloodRiskPage() {
 
   // Coordinates for Yaoundé (Nkolbisson)
   const coordinates: [number, number] = risk?.coordinates ? [Number(risk.coordinates.lat), Number(risk.coordinates.lon)] : [12.1364, 15.0557]
+  const riskPercent = risk?.estimated_risk_percent == null ? null : Number(risk.estimated_risk_percent)
+  const hasQuantitativeRisk = riskPercent != null && Number.isFinite(riskPercent)
+  const hasPartialRisk = risk?.prediction_status === 'PARTIAL_DATA'
+  const gaugeDashOffset = hasQuantitativeRisk ? Math.max(0, 125.6 * (1 - Math.min(100, Math.max(0, riskPercent)) / 100)) : 125.6
+  const summaryCallout = !hasQuantitativeRisk
+    ? {
+        className: 'border-amber-100 bg-amber-50/80 text-amber-800',
+        text: risk?.prediction_status === 'INSUFFICIENT_DATA'
+          ? 'Quantitative flood risk is withheld because the validated model input set is incomplete. Environmental evidence is shown separately.'
+          : 'A validated quantitative flood-risk estimate is not available for this assessment.',
+      }
+    : riskPercent >= 67
+      ? { className: 'border-red-100 bg-red-50/80 text-red-700', text: 'High flood-risk conditions are indicated for the next 24–72 hours. Follow local safety guidance and monitor official alerts.' }
+      : riskPercent >= 34
+        ? { className: 'border-amber-100 bg-amber-50/80 text-amber-800', text: 'Moderate flood-risk conditions are indicated for the next 24–72 hours. Monitor rainfall and local water levels.' }
+        : { className: 'border-emerald-100 bg-emerald-50/80 text-emerald-800', text: 'Low flood-risk conditions are indicated for the next 24–72 hours. Continue monitoring changing conditions.' }
 
   const handleConfirmAndViewDashboard = async () => {
-    const userRaw = localStorage.getItem('aquaguard_user')
-    if (!userRaw) {
+    const currentSession = getSession()
+    if (!currentSession) {
+      window.sessionStorage.removeItem(draftKey)
       navigate('/')
       return
     }
+    if (currentSession.role === 'admin' || currentSession.role === 'administrator') {
+      navigate('/admin-dashboard')
+      return
+    }
+    setLoadingAction('saving'); setLoadingError(null)
     try {
       const localityToSave = specificArea || city || 'Far North'
-      if (!risk || risk.estimated_risk_percent == null || risk.confidence_score == null || !risk.risk_level) {
+      const userId = currentSession.user_id || currentSession.username || currentSession.email || 'unknown'
+      console.log(`[Assessment] user=${userId} locality=${localityToSave}`)
+      if (!risk || risk.estimated_risk_percent == null || !risk.risk_level) {
         throw new Error('The authoritative prediction is unavailable and cannot be saved.')
       }
       const riskPct = Number(risk.estimated_risk_percent)
       const riskLvl = String(risk.risk_level)
-      const conf = Number(risk.confidence_score)
-      await userPredictionsApi.save({
+      const saved = await userPredictionsApi.save({
         locality: localityToSave,
         risk_level: riskLvl,
         estimated_risk_percent: riskPct,
-        confidence_score: conf,
+        confidence_score: risk.confidence_score == null ? undefined : Number(risk.confidence_score),
         forecast_period: 'Next 24–72 hrs',
         details: {
           risk,
@@ -665,12 +662,19 @@ export default function AssessFloodRiskPage() {
           area: specificArea,
           city,
           region,
+          assessment_draft_id: assessmentDraftId,
         },
       })
+      if (!saved.assessment_id) throw new Error('The server did not confirm an assessment identity.')
+      console.log(`[Prediction] assessment=${saved.assessment_id} prediction=${saved.prediction_id} locality=${localityToSave}`)
+      window.sessionStorage.removeItem(draftKey)
+      navigate(`/citizen-entry?assessment=${encodeURIComponent(String(saved.assessment_id))}`)
     } catch (err) {
       console.error('Failed to save prediction to user profile:', err)
+      setLoadingError(err instanceof Error ? `We could not save your assessment. ${err.message}` : 'We could not save your assessment. Please try again.')
+    } finally {
+      setLoadingAction(null)
     }
-    navigate('/citizen-entry')
   }
 
   return (
@@ -994,14 +998,14 @@ export default function AssessFloodRiskPage() {
                       type="text"
                       value={city}
                       onFocus={() => setIsSuggestionMenuOpen(true)}
-                      onChange={(e) => { setCity(e.target.value); setSpecificArea(e.target.value); setIsSuggestionMenuOpen(true) }}
+                      onChange={(e) => { resetAssessmentForLocality(e.target.value); setIsSuggestionMenuOpen(true) }}
                       onBlur={() => window.setTimeout(() => setIsSuggestionMenuOpen(false), 120)}
                       onKeyDown={(e) => { if (e.key === 'Escape') setIsSuggestionMenuOpen(false) }}
                       placeholder="Search a town or locality, e.g. Kousséri"
                       className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
                     />
                     {isSuggestionMenuOpen && suggestions.length > 0 && <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
-                      {suggestions.map((suggestion) => <button key={`${suggestion.name}-${suggestion.division || ''}`} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setCity(suggestion.name); setSpecificArea(suggestion.name); setSuggestions([]); setIsSuggestionMenuOpen(false) }} className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs hover:bg-blue-50"><span><b className="text-slate-800">{suggestion.name}</b>{suggestion.division && <span className="ml-2 text-slate-400">{suggestion.division}</span>}</span><span className={`text-[10px] font-bold ${suggestion.covered ? 'text-emerald-600' : 'text-amber-600'}`}>{suggestion.covered ? 'Model covered' : 'Gazetteer place'}</span></button>)}
+                      {suggestions.map((suggestion) => <button key={`${suggestion.name}-${suggestion.division || ''}`} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { resetAssessmentForLocality(suggestion.name); setSuggestions([]); setIsSuggestionMenuOpen(false) }} className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs hover:bg-blue-50"><span><b className="text-slate-800">{suggestion.name}</b>{suggestion.division && <span className="ml-2 text-slate-400">{suggestion.division}</span>}</span><span className={`text-[10px] font-bold ${suggestion.covered ? 'text-emerald-600' : 'text-amber-600'}`}>{suggestion.covered ? 'Model covered' : 'Gazetteer place'}</span></button>)}
                     </div>}
                   </div>}
 
@@ -1194,7 +1198,7 @@ export default function AssessFloodRiskPage() {
                         stroke="url(#gaugeGradStep3)"
                         strokeWidth="8"
                         strokeDasharray="125.6"
-                        strokeDashoffset="27"
+                        strokeDashoffset={gaugeDashOffset}
                         strokeLinecap="round"
                       />
                       <defs>
@@ -1204,7 +1208,7 @@ export default function AssessFloodRiskPage() {
                           <stop offset="100%" stopColor="#ef4444" />
                         </linearGradient>
                       </defs>
-                      <circle cx="82" cy="26" r="4.5" fill="#ef4444" stroke="#ffffff" strokeWidth="2" />
+                      {hasQuantitativeRisk && <circle cx="82" cy="26" r="4.5" fill={riskPercent >= 67 ? '#ef4444' : riskPercent >= 34 ? '#f59e0b' : '#22c55e'} stroke="#ffffff" strokeWidth="2" />}
                     </svg>
 
                     <div className="absolute bottom-1 flex flex-col items-center text-center">
@@ -1215,15 +1219,15 @@ export default function AssessFloodRiskPage() {
                         {risk?.risk_level || 'Unavailable'} Risk
                       </span>
                       <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                        Confidence: {risk?.confidence_score == null ? '—' : `${Number(risk.confidence_score).toFixed(1)}%`}
+                        {hasPartialRisk ? 'Validated partial-data score' : `Confidence: ${risk?.confidence_score == null ? '—' : `${Number(risk.confidence_score).toFixed(1)}%`}`}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Red Callout Box */}
-                <div className="bg-red-50/80 border border-red-100 rounded-xl p-3 text-center text-xs font-semibold text-red-700">
-                  There is a high probability of flooding in the selected area within the next 24–72 hours.
+                <div className={`border rounded-xl p-3 text-center text-xs font-semibold ${summaryCallout.className}`}>
+                  {summaryCallout.text}
                 </div>
               </div>
 
@@ -1260,11 +1264,11 @@ export default function AssessFloodRiskPage() {
                   <div className="bg-slate-50/70 rounded-xl p-3 border border-slate-100 flex flex-col justify-between space-y-2">
                     <Gauge className="w-4 h-4 text-blue-600" />
                     <div>
-                      <p className="text-[10px] text-slate-400 font-semibold">Flood Probability</p>
+                      <p className="text-[10px] text-slate-400 font-semibold">{risk?.score_label || 'Flood Risk Estimate'}</p>
                       <p className="text-lg font-extrabold text-slate-900 mt-0.5">{risk?.estimated_risk_percent == null ? '—' : `${Number(risk.estimated_risk_percent).toFixed(1)}%`}</p>
                     </div>
-                    <span className="inline-flex text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-md w-fit">
-                      High
+                    <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md w-fit ${risk?.risk_level === 'HIGH' || risk?.risk_level === 'VERY_HIGH' ? 'text-red-600 bg-red-50' : risk?.risk_level === 'MODERATE' ? 'text-amber-700 bg-amber-50' : risk?.risk_level === 'LOW' ? 'text-emerald-700 bg-emerald-50' : 'text-slate-500 bg-slate-100'}`}>
+                      {risk?.risk_level || 'Unavailable'}
                     </span>
                   </div>
 
@@ -1272,11 +1276,11 @@ export default function AssessFloodRiskPage() {
                   <div className="bg-slate-50/70 rounded-xl p-3 border border-slate-100 flex flex-col justify-between space-y-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
                     <div>
-                      <p className="text-[10px] text-slate-400 font-semibold">Prediction Confidence</p>
-                      <p className="text-lg font-extrabold text-slate-900 mt-0.5">{risk?.confidence_score == null ? '—' : `${Number(risk.confidence_score).toFixed(1)}%`}</p>
+                      <p className="text-[10px] text-slate-400 font-semibold">{hasPartialRisk ? 'Prediction basis' : 'Prediction Confidence'}</p>
+                      <p className="text-lg font-extrabold text-slate-900 mt-0.5">{hasPartialRisk ? 'Core inputs' : risk?.confidence_score == null ? '—' : `${Number(risk.confidence_score).toFixed(1)}%`}</p>
                     </div>
                     <span className="inline-flex text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md w-fit">
-                      Very High ↗
+                      {hasPartialRisk ? 'Validated' : risk?.confidence_score == null ? 'Unavailable' : 'Reported'}
                     </span>
                   </div>
 
@@ -1365,7 +1369,7 @@ export default function AssessFloodRiskPage() {
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-600" /> Very High (&gt;80%)</span>
                   </div>
                   <div className="mt-3 grid grid-cols-5 gap-1 text-[9px]">
-                    {(forecast?.trajectory || []).map((point: any) => <div key={point.date} className="rounded border border-slate-100 p-1 text-center"><b>{String(point.date).slice(5)}</b><br />{Number(point.local_rainfall_3d_mm || 0).toFixed(1)}mm<br /><span className={point.option_b_threshold_flag ? 'text-red-600 font-bold' : 'text-emerald-600'}>{point.option_b_threshold_flag ? 'elevated' : 'baseline'}</span></div>)}
+                    {(forecast?.trajectory || []).map((point: any) => <div key={point.date} className="rounded border border-slate-100 p-1 text-center"><b>{String(point.date).slice(5)}</b><br />{point.local_rainfall_3d_mm == null ? 'unavailable' : `${Number(point.local_rainfall_3d_mm).toFixed(1)}mm`}<br /><span className={point.option_b_threshold_flag ? 'text-red-600 font-bold' : 'text-emerald-600'}>{point.option_b_threshold_flag ? 'elevated' : 'baseline'}</span></div>)}
                   </div>
                   {forecast?.basin_rainfall_data_source && <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-[10px] text-amber-800"><b>Basin rainfall disclosure:</b> {forecast.basin_rainfall_data_source}</p>}
                   {(forecast?.trajectory || []).some((p: any) => p.discharge_lag_fallback) && <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-[10px] text-amber-800"><b>Discharge-lag disclosure:</b> early forecast days use the nearest available lead time in place of a true historical lag - treat these days' RF probability with extra caution.</p>}
@@ -1565,13 +1569,15 @@ export default function AssessFloodRiskPage() {
 
                   <button
                     onClick={handleConfirmAndViewDashboard}
-                    className="flex-1 sm:flex-initial bg-[#0f2460] hover:bg-[#0a1c4e] text-white font-bold text-xs py-3 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer group"
+                    disabled={loadingAction === 'saving'}
+                    className="flex-1 sm:flex-initial bg-[#0f2460] hover:bg-[#0a1c4e] text-white font-bold text-xs py-3 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer group disabled:cursor-wait disabled:opacity-70"
                   >
-                    <span>Confirm &amp; View Dashboard</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    {loadingAction === 'saving' ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
+                    <span>{loadingAction === 'saving' ? 'Saving assessment…' : user ? 'Confirm & Review' : 'Confirm & View Dashboard'}</span>
                   </button>
                 </div>
               </div>
+              {loadingError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-700">{loadingError}</p>}
             </div>
           </div>
         </main>

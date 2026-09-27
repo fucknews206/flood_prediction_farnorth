@@ -165,6 +165,7 @@ core/src/flood_prediction/www/
 ui/src/screenshots/
 core/.data/
 core/venv-mcp/
+data_quality/farnorth_consolidation/environmental_observation_audit.jsonl
 
 local/
 

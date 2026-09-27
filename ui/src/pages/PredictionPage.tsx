@@ -22,6 +22,7 @@ import {
   farNorthRiskApi,
   aiApi
 } from '@/lib/api'
+import { getSession } from '@/lib/session'
 
 // Available reference localities
 const REFERENCE_LOCALITIES = [
@@ -35,7 +36,7 @@ const REFERENCE_LOCALITIES = [
 
 export interface TrajectoryPoint {
   date: string
-  local_rainfall_1d_mm: number
+  local_rainfall_1d_mm: number | null
   local_rainfall_3d_mm?: number
   soil_moisture?: number
   glofas_discharge_m3s?: number | null
@@ -54,75 +55,9 @@ export interface ActiveAiContext {
   selectedDate: string
   selectedRiskValue: string
   forecastPeriod: string
-  rainfall: number
+  rainfall: number | null
   discharge: number | null
   dayIndex: number
-}
-
-function generateDefaultTrajectory(locality: string): TrajectoryPoint[] {
-  const baseDates = [
-    '2026-09-26',
-    '2026-09-27',
-    '2026-09-28',
-    '2026-09-29',
-    '2026-09-30',
-    '2026-10-01',
-    '2026-10-02'
-  ]
-  const localityProfiles: Record<string, { rain: number[]; disch: number[]; flags: boolean[]; probs: number[] }> = {
-    Doukoula: {
-      rain: [0.1, 1.4, 14.8, 8.6, 2.8, 0.4, 0.0],
-      disch: [88.2, 92.5, 142.0, 165.4, 148.2, 118.0, 95.5],
-      flags: [false, false, true, true, false, false, false],
-      probs: [0.246, 0.251, 0.315, 0.338, 0.276, 0.248, 0.235]
-    },
-    Kousséri: {
-      rain: [0.4, 2.2, 18.5, 12.0, 4.1, 1.0, 0.2],
-      disch: [145.0, 158.2, 210.0, 245.8, 220.4, 180.2, 155.0],
-      flags: [false, false, true, true, true, false, false],
-      probs: [0.380, 0.395, 0.542, 0.589, 0.490, 0.410, 0.365]
-    },
-    Maroua: {
-      rain: [0.0, 0.8, 9.5, 4.2, 1.1, 0.0, 0.0],
-      disch: [45.0, 48.0, 72.5, 68.0, 52.0, 46.0, 42.0],
-      flags: [false, false, false, false, false, false, false],
-      probs: [0.185, 0.190, 0.235, 0.210, 0.195, 0.182, 0.175]
-    },
-    Yagoua: {
-      rain: [0.2, 3.1, 22.0, 16.5, 6.4, 1.2, 0.1],
-      disch: [110.0, 124.0, 188.0, 215.0, 192.0, 145.0, 118.0],
-      flags: [false, false, true, true, true, false, false],
-      probs: [0.290, 0.315, 0.485, 0.520, 0.410, 0.320, 0.280]
-    },
-    Blangoua: {
-      rain: [0.0, 0.5, 8.2, 5.0, 2.0, 0.4, 0.0],
-      disch: [220.0, 235.0, 280.0, 310.0, 295.0, 260.0, 230.0],
-      flags: [false, false, true, true, true, true, false],
-      probs: [0.420, 0.445, 0.612, 0.665, 0.590, 0.510, 0.440]
-    },
-    Maga: {
-      rain: [0.1, 1.8, 16.4, 11.2, 3.5, 0.8, 0.0],
-      disch: [95.0, 102.0, 155.0, 180.0, 162.0, 130.0, 105.0],
-      flags: [false, false, true, true, false, false, false],
-      probs: [0.260, 0.275, 0.365, 0.395, 0.310, 0.265, 0.250]
-    }
-  }
-  const profile = localityProfiles[locality] || localityProfiles.Doukoula
-  return baseDates.map((d, i) => {
-    const rain = profile.rain[i]
-    const rain3d = i === 0 ? rain : i === 1 ? rain + profile.rain[0] : rain + profile.rain[i - 1] + profile.rain[i - 2]
-    return {
-      date: d,
-      local_rainfall_1d_mm: rain,
-      local_rainfall_3d_mm: Number(rain3d.toFixed(1)),
-      soil_moisture: Number((42.0 + (profile.flags[i] ? 12.0 : 0.0) + Math.sin(i) * 3).toFixed(1)),
-      glofas_discharge_m3s: profile.disch[i],
-      option_b_threshold_flag: profile.flags[i],
-      option_b_risk_level: profile.flags[i] ? 'Elevated' : 'Low',
-      classifier_probability: profile.probs[i],
-      discharge_lag_fallback: i === 0
-    }
-  })
 }
 
 export default function PredictionPage() {
@@ -138,6 +73,8 @@ export default function PredictionPage() {
   const [prediction, setPrediction] = useState<any>(null)
   const [, setLoading] = useState(true)
   const [forecastTrajectory, setForecastTrajectory] = useState<TrajectoryPoint[]>([])
+  const [liveStatus, setLiveStatus] = useState<'loading' | 'available' | 'unavailable'>('loading')
+  const [liveMessage, setLiveMessage] = useState('Loading live environmental assessment…')
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(2) // Default Day 3 (elevated point)
 
   // Active AI Chart Context state
@@ -162,12 +99,7 @@ export default function PredictionPage() {
   const [dataSourcesOpen, setDataSourcesOpen] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem('aquaguard_user')
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored))
-      } catch {}
-    }
+    setUser(getSession())
     userPredictionsApi.getMe().then((u) => {
       if (u) setUser((prev) => ({ ...prev, ...u }))
     }).catch(() => {})
@@ -179,6 +111,8 @@ export default function PredictionPage() {
     setLoading(true)
     setIsRefreshing(true)
     try {
+      // Load the user's latest SAVED prediction — this is the authoritative
+      // record. Never overwrite it with live data.
       const res = await userPredictionsApi.getLatest()
       if (res?.prediction) {
         setPrediction(res.prediction)
@@ -186,20 +120,28 @@ export default function PredictionPage() {
         setPrediction(null)
       }
 
-      // Load forecast trajectory for selected locality
+      // Load live forecast trajectory for the selected locality (supplementary)
       try {
         const fData = await farNorthRiskApi.forecast(selectedLocality)
         if (fData?.trajectory && Array.isArray(fData.trajectory) && fData.trajectory.length > 0) {
           setForecastTrajectory(fData.trajectory)
+          setLiveStatus('available')
+          setLiveMessage('Live environmental forecast loaded. A quantitative prediction is shown only when a validated model profile is eligible.')
         } else {
-          setForecastTrajectory(generateDefaultTrajectory(selectedLocality))
+          setForecastTrajectory([])
+          setLiveStatus('unavailable')
+          setLiveMessage(fData?.message || 'Live prediction temporarily unavailable. No reference trajectory is shown.')
         }
       } catch {
-        setForecastTrajectory(generateDefaultTrajectory(selectedLocality))
+        setForecastTrajectory([])
+        setLiveStatus('unavailable')
+        setLiveMessage('Live prediction temporarily unavailable. No reference trajectory is shown.')
       }
     } catch {
       setPrediction(null)
-      setForecastTrajectory(generateDefaultTrajectory(selectedLocality))
+      setForecastTrajectory([])
+      setLiveStatus('unavailable')
+      setLiveMessage('Live prediction temporarily unavailable. No reference trajectory is shown.')
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -233,13 +175,13 @@ export default function PredictionPage() {
         glofas_discharge_m3s: activeAiContext.discharge
       } : {
         location: `${selectedLocality} · Far North Region`,
-        prediction: prediction?.risk_level || 'Low',
-        risk: 'Low risk',
-        probability: '24.6%',
-        confidence: '78%',
-        selected_date: '2026-09-26',
-        selected_risk_value_state: 'Baseline',
-        forecast_period: 'Next 24-72 hours'
+        prediction: prediction?.risk_level || 'Unavailable',
+        risk: 'Quantitative prediction unavailable',
+        probability: 'Unavailable',
+        confidence: 'Unavailable',
+        selected_date: 'Unavailable',
+        selected_risk_value_state: 'Awaiting validated live inputs',
+        forecast_period: 'No validated forecast trajectory'
       }
 
       const res = await aiApi.chat({
@@ -258,14 +200,15 @@ export default function PredictionPage() {
       if (activeAiContext) {
         const isElev = activeAiContext.risk.includes('Elevated')
         const q = query.toLowerCase()
+        const rainfallText = activeAiContext.rainfall == null ? 'unavailable' : `${activeAiContext.rainfall} mm`
 
         if (q.includes('why') || q.includes('elevated') || q.includes('cause') || q.includes('driving')) {
           contextualAnswer = isElev
             ? `On **${activeAiContext.selectedDate} (Day ${activeAiContext.dayIndex + 1})**, the risk in **${selectedLocality}** elevates to **${activeAiContext.probability}** because:
-1. **Precipitation Surge**: The model projects **${activeAiContext.rainfall} mm** of 24-hour rainfall (pushing 3-day accumulated rainfall past the local 90th-percentile threshold).
+1. **Precipitation Surge**: The available 24-hour rainfall value is **${rainfallText}**.
 2. **Upstream River Inflow**: River discharge is forecasted at **${activeAiContext.discharge != null ? activeAiContext.discharge.toFixed(1) + ' m³/s' : 'elevated volume'}** via the Copernicus GloFAS model for the Logone/Chari river network.
 3. **Soil Saturation**: Soil moisture exceeds baseline retention capacity, causing immediate runoff into local waterways (mayos).`
-            : `On **${activeAiContext.selectedDate} (Day ${activeAiContext.dayIndex + 1})**, conditions in **${selectedLocality}** remain at **Baseline**. 24-hour precipitation is minimal at **${activeAiContext.rainfall} mm**, and river discharge is stable at **${activeAiContext.discharge != null ? activeAiContext.discharge.toFixed(1) + ' m³/s' : 'normal'}**, keeping risk below the warning threshold.`
+            : `On **${activeAiContext.selectedDate} (Day ${activeAiContext.dayIndex + 1})**, the threshold is quiet. 24-hour precipitation is **${rainfallText}**, and river discharge is **${activeAiContext.discharge != null ? activeAiContext.discharge.toFixed(1) + ' m³/s' : 'unavailable'}**. This is environmental context, not a quantitative prediction.`
         } else if (q.includes('precaution') || q.includes('safety') || q.includes('do') || q.includes('action')) {
           contextualAnswer = `**Recommended precautions for ${selectedLocality} on ${activeAiContext.selectedDate}:**
 - **Drainage clearing**: Ensure compound ditches and drainage conduits are clear of debris ahead of expected rainfall.
@@ -280,14 +223,14 @@ export default function PredictionPage() {
         } else {
           contextualAnswer = `Based on the trajectory context for **${selectedLocality}** on **${activeAiContext.selectedDate}**:
 - **Forecast Day**: Day ${activeAiContext.dayIndex + 1} of 7-day outlook
-- **Rainfall**: ${activeAiContext.rainfall} mm
+- **Rainfall**: ${rainfallText}
 - **River Discharge**: ${activeAiContext.discharge != null ? activeAiContext.discharge.toFixed(1) + ' m³/s' : 'Stable'}
 - **Risk Evaluation**: ${activeAiContext.selectedRiskValue} (Signal: ${activeAiContext.probability}, Confidence: ${activeAiContext.confidence}).
 
 Stay alert to weather updates and follow Cameroon Department of Civil Protection guidelines.`
         }
       } else {
-        contextualAnswer = `The **${selectedLocality}** assessment indicates a 24.6% flood risk signal with 78% model confidence over the 24-72 hour horizon. Key factors include 0.1 mm 3-day precipitation and 44.6% soil saturation.`
+        contextualAnswer = `A quantitative assessment for **${selectedLocality}** is not available yet because the validated live inputs required by the operational model are incomplete. No reference percentage or default forecast is being shown.`
       }
 
       setChatMessages((prev) => [...prev, { sender: 'ai', text: contextualAnswer }])
@@ -296,10 +239,9 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
     }
   }
 
-  const currentTrajectory = forecastTrajectory.length > 0
-    ? forecastTrajectory
-    : generateDefaultTrajectory(selectedLocality)
+  const currentTrajectory = forecastTrajectory
   const currentSelectedPoint = currentTrajectory[selectedDayIndex] || currentTrajectory[0]
+  const hasValidatedProbabilityTrajectory = currentTrajectory.length > 0 && currentTrajectory.every((point) => point.classifier_probability != null)
 
   const displayName = user?.name || user?.username || 'jeanongoubolo'
 
@@ -315,10 +257,9 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
       <div className="flex-1 flex flex-col min-w-0 bg-[#060B13]">
         {/* Top Header Bar */}
         <header className="bg-[#060B13] border-b border-slate-800/80 px-6 sm:px-8 py-3.5 flex items-center justify-between sticky top-0 z-20">
-          {/* Status Indicator (Image 1 exact match: Reference assessment) */}
           <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-            <span className="h-2 w-2 rounded-full bg-amber-500" />
-            <span>Reference assessment</span>
+            <span className={`h-2 w-2 rounded-full ${liveStatus === 'available' ? 'bg-emerald-500' : liveStatus === 'loading' ? 'bg-blue-500 animate-pulse' : 'bg-amber-500'}`} />
+            <span>{liveStatus === 'available' ? 'Live environmental assessment' : liveStatus === 'loading' ? 'Checking live providers' : 'Live assessment unavailable'}</span>
           </div>
 
           {/* Right Controls */}
@@ -409,14 +350,11 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
               )}
             </div>
 
-            <span className="text-slate-500 text-xs">
-              Only the supplied assessment is available.
-            </span>
+            <span className="text-slate-500 text-xs">Live data only — unavailable providers never receive reference values.</span>
           </div>
 
-          {/* Reference Notice Banner */}
           <div className="border-l-2 border-amber-500 pl-3 py-1 text-xs text-slate-400 font-medium">
-            Reference assessment from 25 Sep 2026. This page does not receive live prediction updates.
+            {liveMessage}
           </div>
 
           {/* Current Flood Risk Main Card (Image 1 Exact Layout) */}
@@ -427,32 +365,34 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
                 <p className="text-xs text-slate-400 font-medium">
                   Current flood risk - {selectedLocality}, Far North Region
                 </p>
-                <h2 className="text-3xl sm:text-4xl font-black text-emerald-400 tracking-tight">
-                  Low risk
+                <h2 className={`text-3xl sm:text-4xl font-black tracking-tight ${prediction?.prediction_status === 'FULL_PREDICTION' || prediction?.prediction_status === 'PARTIAL_DATA' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {prediction?.prediction_status === 'FULL_PREDICTION' || prediction?.prediction_status === 'PARTIAL_DATA' ? `${prediction?.risk_level || 'Available'} risk` : 'Quantitative prediction unavailable'}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-300 font-normal leading-relaxed pt-1">
-                  Current model indicators suggest a low flood-risk signal for this location over the forecast period.
+                  {prediction?.prediction_status === 'FULL_PREDICTION' || prediction?.prediction_status === 'PARTIAL_DATA'
+                    ? (prediction?.prediction_status === 'PARTIAL_DATA' ? 'A calibrated risk score is available from validated local rain, soil, discharge-history and terrain inputs. Radar and SAR are optional supporting evidence.' : 'Validated full-model inputs are available for this forecast period.')
+                    : (prediction?.explanation || liveMessage)}
                 </p>
               </div>
 
               {/* Right Column: Key Metrics */}
               <div className="flex items-center gap-8 flex-wrap pt-2 lg:pt-0">
                 <div>
-                  <p className="text-[11px] font-semibold text-slate-400">Flood probability</p>
+                  <p className="text-[11px] font-semibold text-slate-400">{prediction?.score_label || 'Validated probability'}</p>
                   <p className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">
-                    24.6%
+                    {prediction?.prediction_status === 'PARTIAL_DATA' && prediction?.risk_score != null ? `${Number(prediction.risk_score).toFixed(1)}%` : prediction?.prediction_status === 'FULL_PREDICTION' && prediction?.probability_if_validated != null ? `${Number(prediction.probability_if_validated).toFixed(1)}%` : '—'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold text-slate-400">Prediction confidence</p>
+                  <p className="text-[11px] font-semibold text-slate-400">Data quality</p>
                   <p className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">
-                    78%
+                    {prediction?.data_quality || '—'}
                   </p>
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold text-slate-400">Forecast period</p>
                   <p className="text-base sm:text-lg font-bold text-white tracking-tight mt-1">
-                    Next 24–72 hours
+                    {forecastTrajectory.length ? `Next ${forecastTrajectory.length} forecast days` : 'Unavailable'}
                   </p>
                 </div>
               </div>
@@ -467,7 +407,7 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
                 <div className="bg-rose-900/60 rounded-sm" />
               </div>
               <div className="grid grid-cols-4 text-[10px] text-slate-400 font-medium pt-0.5">
-                <span className="text-emerald-400 font-bold">Low · current</span>
+                <span className="text-emerald-400 font-bold">Available only when validated</span>
                 <span className="text-slate-400">Moderate</span>
                 <span className="text-slate-400">High</span>
                 <span className="text-slate-400">Very high</span>
@@ -476,7 +416,7 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
 
             {/* Timestamp Notice */}
             <p className="text-[11px] text-slate-500 font-normal pt-1">
-              Last assessed: 25 Sep 2026 · 19:48:38 · Time zone not specified in the supplied record
+              {prediction?.prediction_timestamp ? `Last checked: ${new Date(prediction.prediction_timestamp).toLocaleString()}` : 'No live assessment timestamp available'}
             </p>
 
             {/* Actions Row */}
@@ -686,27 +626,27 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
             </div>
           </div>
 
-          {/* 7-day risk trajectory (Interactive, click-to-ask) */}
+          {/* 7-day environmental outlook */}
           <div className="bg-[#0A101D] border border-slate-800/80 rounded-2xl p-6 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-white">7-day risk trajectory</h3>
+                  <h3 className="text-sm font-bold text-white">7-day environmental outlook</h3>
                   <span className="text-[10px] font-semibold bg-blue-950/60 text-blue-300 border border-blue-800/60 px-2 py-0.5 rounded-full">
-                    Interactive forecast
+                    Live provider evidence
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1 font-normal">
-                  Open-Meteo High-Resolution NWP + Copernicus GloFAS operational streamflow for {selectedLocality}.
+                  Open-Meteo forecast evidence and GloFAS provider status for {selectedLocality}; probabilities require a complete validated model input set.
                 </p>
               </div>
 
               <div className="flex items-center gap-2 text-[11px] text-slate-400">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Baseline
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Threshold quiet
                 </span>
                 <span className="flex items-center gap-1.5 ml-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Elevated
+                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Threshold active
                 </span>
               </div>
             </div>
@@ -716,8 +656,10 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
               {currentTrajectory.map((point, idx) => {
                 const isSelected = selectedDayIndex === idx
                 const isElevated = Boolean(point.option_b_threshold_flag)
-                const rain = Number(point.local_rainfall_1d_mm || 0)
-                const maxRain = Math.max(15, ...currentTrajectory.map(p => Number(p.local_rainfall_1d_mm || 0)))
+                const hasRain = point.local_rainfall_1d_mm != null
+                const rain = hasRain ? Number(point.local_rainfall_1d_mm) : 0
+                const rainfallValues = currentTrajectory.map(p => p.local_rainfall_1d_mm).filter((value): value is number => value != null).map(Number)
+                const maxRain = Math.max(15, ...rainfallValues)
                 const barHeight = Math.max(8, Math.round((rain / maxRain) * 56))
                 const dateObj = new Date(point.date)
                 const weekday = idx === 0 ? 'Today' : dateObj.toLocaleDateString('en-US', { weekday: 'short' })
@@ -728,7 +670,7 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
                     key={point.date}
                     onClick={() => handleSelectDay(idx)}
                     type="button"
-                    aria-label={`Select forecast for Day ${idx + 1}, ${point.date}: ${rain} mm rainfall, ${isElevated ? 'Elevated' : 'Baseline'}`}
+                    aria-label={`Select environmental outlook for Day ${idx + 1}, ${point.date}: ${hasRain ? `${rain} mm rainfall` : 'rainfall unavailable'}, ${isElevated ? 'threshold active' : 'threshold quiet'}`}
                     className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between h-44 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                       isSelected
                         ? 'bg-blue-950/40 border-blue-500 ring-1 ring-blue-500/50 shadow-lg shadow-blue-900/20'
@@ -741,7 +683,7 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                           isElevated ? 'bg-rose-950/80 text-rose-300 border border-rose-800/60' : 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/40'
                         }`}>
-                          {isElevated ? 'Elevated' : 'Baseline'}
+                          {isElevated ? 'Threshold active' : 'Threshold quiet'}
                         </span>
                       </div>
                       <p className="text-[10px] text-slate-400 mt-0.5">{monthDay}</p>
@@ -756,7 +698,7 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
                         style={{ height: `${barHeight}px` }}
                       />
                       <span className="absolute bottom-1 right-1.5 text-[9px] font-mono text-slate-300 font-semibold bg-slate-900/80 px-1 rounded">
-                        {rain.toFixed(1)}mm
+                        {hasRain ? `${rain.toFixed(1)}mm` : '—'}
                       </span>
                     </div>
 
@@ -770,7 +712,7 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
                       <div className="flex items-center justify-between text-slate-400">
                         <span>Prob:</span>
                         <span className="text-blue-300 font-mono font-semibold">
-                          {point.classifier_probability != null ? `${(Number(point.classifier_probability) * 100).toFixed(0)}%` : '25%'}
+                          {point.classifier_probability != null ? `${(Number(point.classifier_probability) * 100).toFixed(0)}%` : '—'}
                         </span>
                       </div>
                     </div>
@@ -780,7 +722,7 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
             </div>
 
             {/* 7-Day Risk Line Chart (SVG) */}
-            {(() => {
+            {hasValidatedProbabilityTrajectory && currentSelectedPoint ? (() => {
               const maxProb = Math.max(0.1, ...currentTrajectory.map(p => Number(p.classifier_probability || 0)))
               const chartW = 560
               const chartH = 80
@@ -802,20 +744,20 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
               return (
                 <div className="mt-4 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-[11px] text-slate-400 font-medium">RF Flood Probability · 7-day outlook</p>
+                    <p className="text-[11px] text-slate-400 font-medium">Validated model probability · 7-day outlook</p>
                     <button
                       onClick={() => navigate('/ai-assistant', { state: { trajectoryContext: {
                         location: `${selectedLocality} · Far North Region`,
-                        prediction: `${prediction?.risk_level || 'Low'} risk`,
+                        prediction: prediction?.risk_level ? `${prediction.risk_level} risk` : 'Quantitative prediction unavailable',
                         risk: currentSelectedPoint.option_b_threshold_flag ? 'Elevated risk state' : 'Baseline normal risk state',
-                        probability: `${(Number(currentSelectedPoint.classifier_probability || 0) * 100).toFixed(1)}%`,
-                        confidence: `${prediction?.confidence_score || 78}%`,
+                        probability: currentSelectedPoint.classifier_probability != null ? `${(Number(currentSelectedPoint.classifier_probability) * 100).toFixed(1)}%` : 'Unavailable',
+                        confidence: prediction?.confidence_score != null ? `${Number(prediction.confidence_score).toFixed(1)}%` : 'Unavailable',
                         selectedDate: currentSelectedPoint.date,
                         selectedRiskValue: currentSelectedPoint.option_b_threshold_flag
                           ? `Elevated — ${Number(currentSelectedPoint.local_rainfall_1d_mm||0).toFixed(1)}mm rain, ${currentSelectedPoint.glofas_discharge_m3s != null ? Number(currentSelectedPoint.glofas_discharge_m3s).toFixed(1)+' m³/s' : 'discharge pending'}`
                           : `Baseline — ${Number(currentSelectedPoint.local_rainfall_1d_mm||0).toFixed(1)}mm rain`,
                         forecastPeriod: `Day ${selectedDayIndex + 1} of 7-day forecast`,
-                        rainfall: Number(currentSelectedPoint.local_rainfall_1d_mm || 0),
+                        rainfall: currentSelectedPoint.local_rainfall_1d_mm != null ? Number(currentSelectedPoint.local_rainfall_1d_mm) : null,
                         discharge: currentSelectedPoint.glofas_discharge_m3s != null ? Number(currentSelectedPoint.glofas_discharge_m3s) : null,
                         dayIndex: selectedDayIndex,
                         trajectory: currentTrajectory,
@@ -882,7 +824,11 @@ Stay alert to weather updates and follow Cameroon Department of Civil Protection
                   </div>
                 </div>
               )
-            })()}
+            })() : (
+              <div className="rounded-xl border border-amber-800/60 bg-amber-950/20 px-4 py-5 text-sm text-amber-200">
+                {hasValidatedProbabilityTrajectory ? liveMessage : 'The environmental outlook is available, but the probability chart is withheld until the full validated model feature set is available. The application will not draw a zero or reference-value chart.'}
+              </div>
+            )}
           </div>
 
           {/* 2-Column Lower Section: Left "More actions" + Right "About this prediction" */}

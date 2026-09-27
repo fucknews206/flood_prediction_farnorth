@@ -8,25 +8,23 @@ import type { Watershed, GeoJSONFeatureCollection, CommunityReport } from '@/lib
 import { geoApi, communityReportsApi } from '@/lib/api'
 
 // ─── RainViewer live radar tile (same pattern as AssessFloodRiskPage) ────────────
-const RV_TILE_URL = 'https://tilecache.rainviewer.com/v2/radar/{radarTs}/256/{z}/{x}/{y}/2/1_1.png'
-
 function RainViewerGWLayer() {
-  const [ts, setTs] = useState<number | null>(null)
+  const [radarBase, setRadarBase] = useState<string | null>(null)
   useEffect(() => {
     const refresh = () =>
       fetch('https://api.rainviewer.com/public/weather-maps.json')
         .then(r => r.json())
-        .then(m => { const past = m?.radar?.past ?? []; if (past.length) setTs(past[past.length - 1].time) })
+        .then(m => { const past = m?.radar?.past ?? []; const frame = past[past.length - 1]; if (frame) { const host = String(m?.host || 'https://tilecache.rainviewer.com').replace(/\/$/, ''); setRadarBase(`${host}${frame.path || `/v2/radar/${frame.time}`}`) } })
         .catch(() => {})
     refresh()
     const id = setInterval(refresh, 120_000)
     return () => clearInterval(id)
   }, [])
-  if (!ts) return null
+  if (!radarBase) return null
   return (
     <TileLayer
-      key={`rv-gw-${ts}`}
-      url={RV_TILE_URL.replace('{radarTs}', String(ts))}
+      key={`rv-gw-${radarBase}`}
+      url={`${radarBase}/256/{z}/{x}/{y}/2/1_1.png`}
       attribution='&copy; <a href="https://rainviewer.com">RainViewer</a>'
       opacity={0.55}
       zIndex={350}

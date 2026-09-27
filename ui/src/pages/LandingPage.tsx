@@ -405,7 +405,7 @@ function Footer({ onNavigate }: { onNavigate: (path: string) => void }) {
               </li>
               <li>
                 <button
-                  onClick={() => onNavigate('/flood-map')}
+                  onClick={() => onNavigate('/public-flood-map')}
                   className="hover:text-slate-900 transition-colors text-left"
                 >
                   Interactive map
@@ -495,10 +495,10 @@ export default function LandingPage() {
       <Navbar onLogin={() => navigate('/login')} />
       <HeroSection
         onAssess={() => navigate('/assess-flood-risk')}
-        onMap={() => navigate('/flood-map')}
+        onMap={() => navigate('/public-flood-map')}
       />
       <CapabilitiesSection />
-      <RiskMappingSection onExplore={() => navigate('/flood-map')} />
+      <RiskMappingSection onExplore={() => navigate('/public-flood-map')} />
       <Footer onNavigate={navigate} />
     </div>
   )

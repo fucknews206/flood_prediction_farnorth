@@ -29,13 +29,12 @@ export H2OGPTE_API_KEY="${H2OGPTE_API_KEY:-$APP_H2OGPTE_API_KEY}"
 export H2OGPTE_URL="${H2OGPTE_URL:-$APP_H2OGPTE_URL}"
 export H2OGPTE_MODEL="${H2OGPTE_MODEL:-$APP_H2OGPTE_MODEL}"
 
-# The Far North risk/forecast API is file-backed and can run in the local
-# demo without PostgreSQL/PostGIS.  Allow an explicit override, but default
-# to the reliable file-backed profile so a stale PostgreSQL password does not
-# make every environmental card appear unavailable.
-# The native app uses the configured PostgreSQL/PostGIS database by default.
-# Set APP_SKIP_DB_INIT=1 explicitly only for a deliberately offline UI run.
-export APP_SKIP_DB_INIT="${APP_SKIP_DB_INIT:-0}"
+# The Far North live assessment/forecast service is file-backed and does not
+# require PostgreSQL/PostGIS.  Default to that working local profile: an
+# unavailable database must never prevent live environmental providers from
+# serving Blangoua or the other covered localities.  Set APP_SKIP_DB_INIT=0
+# only when PostgreSQL/PostGIS is intentionally running and required.
+export APP_SKIP_DB_INIT="${APP_SKIP_DB_INIT:-1}"
 
 # Check required API key
 if [ -z "$NVIDIA_API_KEY" ]; then
@@ -43,13 +42,17 @@ if [ -z "$NVIDIA_API_KEY" ]; then
     exit 1
 fi
 
-# Ensure Redis is running
+# Redis supports background jobs only.  The live environmental assessment and
+# forecast routes do not depend on it, so a missing local Redis must not stop
+# the application from starting.
 echo "Checking Redis status..."
+REDIS_AVAILABLE=0
 if ! redis-cli ping >/dev/null 2>&1; then
-    echo "ERROR: Redis is not running. Please start it using 'sudo systemctl start redis-server'."
-    exit 1
+    echo "WARNING: Redis is not available; starting the live assessment API without the optional background worker."
+else
+    REDIS_AVAILABLE=1
+    echo "Redis is running."
 fi
-echo "Redis is running."
 
 # Create trap to kill background processes on script exit
 cleanup() {
@@ -104,12 +107,14 @@ echo "Starting MCP Server..."
 MCP_PID=$!
 echo "MCP Server started with PID: $MCP_PID"
 
-# 3. Start Redis Worker in background
-echo "Starting RQ background worker..."
-export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-./venv/bin/rq worker > worker_native.log 2>&1 &
-WORKER_PID=$!
-echo "RQ worker started with PID: $WORKER_PID (logs in core/worker_native.log)"
+# 3. Start Redis Worker in background only when Redis is available.
+if [ "$REDIS_AVAILABLE" -eq 1 ]; then
+    echo "Starting RQ background worker..."
+    export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+    ./venv/bin/rq worker > worker_native.log 2>&1 &
+    WORKER_PID=$!
+    echo "RQ worker started with PID: $WORKER_PID (logs in core/worker_native.log)"
+fi
 
 # Give MCP and Worker a moment to initialize
 sleep 2
