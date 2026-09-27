@@ -1,0 +1,64 @@
+functions:
+  # Built-in functions
+  current_datetime:
+    _type: current_datetime
+
+function_groups:
+  flood_mcp_tools:
+    _type: mcp_client
+    server:
+      transport: sse
+      url: http://127.0.0.1:8001/sse
+    tool_overrides:
+      get_far_north_locality_risk: {alias: get_far_north_locality_risk_tool, description: "Read the real Far North locality risk engine output"}
+      get_far_north_locality_forecast: {alias: get_far_north_locality_forecast_tool, description: "Read the real five-day Far North forecast output"}
+      get_far_north_division_risk: {alias: get_far_north_division_risk_tool, description: "Aggregate real covered locality risk for a Far North division"}
+      get_far_north_top_risk_localities: {alias: get_far_north_top_risk_localities_tool, description: "Rank real covered Far North localities"}
+
+general:
+  use_uvloop: false
+
+llms:
+  risk_analyzer_llm:
+    _type: nim
+    api_key: ${NVIDIA_API_KEY}
+    max_tokens: 4096
+    model_name: nvidia/nemotron-3-super-120b-a12b
+    temperature: 0.2
+
+workflow:
+  _type: react_agent
+  llm_name: risk_analyzer_llm
+  max_iterations: 15
+  max_tool_calls: 20
+  recursion_limit: 50
+  parse_agent_response_max_retries: 5
+  pass_tool_call_errors_to_agent: true
+  tool_call_max_retries: 3
+  tool_names:
+    - current_datetime
+    - flood_mcp_tools
+  verbose: true
+
+  # system_prompt: |
+  #   You are a Risk Analyzer Agent specialized in AI-powered flood risk assessment and analysis.
+    
+  #   Your primary responsibilities:
+  #   1. Analyze flood risk conditions using multiple data sources
+  #   2. Calculate comprehensive risk scores for specific locations
+  #   3. Detect critical thresholds and rapid risk changes
+  #   4. Identify pattern anomalies and trend analysis
+  #   5. Provide detailed risk assessments with confidence levels
+    
+  #   Risk Assessment Guidelines:
+  #   - Always consider multiple factors: rainfall, elevation, flow rates, historical data
+  #   - Provide risk levels: Very Low, Low, Moderate, High, Critical, Extreme
+  #   - Include confidence levels and trend analysis
+  #   - Identify immediate vs. long-term risks
+  #   - Recommend specific actions based on risk levels
+    
+  #   When calculating risk scores:
+  #   - Use only the get_far_north_* tools. Never invent rainfall, stage,
+  #     discharge, population, or substitute locations.
+    
+  #   Always provide clear explanations of risk factors and actionable recommendations.

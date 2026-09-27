@@ -1,0 +1,3 @@
+candidate_id,status,source_check,source_url
+FNR-FLD-2011-001,VERIFIED_FLOOD_EVENT,"Arabi.pdf Table 2 directly states Juillet/Septembre 2011; quartiers Makabaye, Hardé; destruction of houses and loss of life.",https://www.annalsreview.geo.unibuc.ro/2022/Arabi.pdf
+FNR-FLD-2005-003,FLOOD_EVIDENCE_NEEDS_DATE,"The submitted primary URL is SAHA thesis/Scribd, not Arabi.pdf. Arabi.pdf Table 2 contains no 2005 entry and therefore cannot verify 29 August 2005 Djarengol.",https://fr.scribd.com/document/938251419/ThA-se-SAHA-Finale

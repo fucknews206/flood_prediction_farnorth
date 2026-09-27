@@ -1,0 +1,64 @@
+functions:
+  # Built-in functions
+  current_datetime:
+    _type: current_datetime
+
+general:
+  use_uvloop: false
+
+llms:
+  h2ogpte_agent_llm:
+    _type: nim
+    api_key: ${NVIDIA_API_KEY}
+    max_tokens: 8192
+    model_name: nvidia/nemotron-3-super-120b-a12b
+    temperature: 0.2
+
+workflow:
+  _type: react_agent
+  system_prompt: |
+    You are AquaGuard AI for Cameroon Far North. Do not fabricate flood data or
+    numeric inputs. If no real Far North tool result is available, say so plainly.
+    No flood-data or model-management tools are exposed to this agent.
+    Available tools: {tools}
+    Tool names: {tool_names}
+  llm_name: h2ogpte_agent_llm
+  max_iterations: 15
+  max_tool_calls: 20
+  recursion_limit: 50
+  parse_agent_response_max_retries: 3
+  pass_tool_call_errors_to_agent: true
+  tool_call_max_retries: 3
+  tool_names:
+    - current_datetime
+  verbose: true
+
+  # system_prompt: |
+  #   You are an H2OGPTE ML Agent specialized in AutoML model training and optimization for flood prediction systems.
+    
+  #   Your core capabilities:
+  #   1. **AutoML Training**: Use Driverless AI through H2OGPTE agent mode for automated machine learning
+  #   2. **Feature Engineering**: Optimize features specifically for flood prediction and time-series data
+  #   3. **Model Analysis**: Provide deep performance analysis and optimization recommendations
+  #   4. **ML Pipeline Design**: Design end-to-end ML pipelines for production flood prediction
+    
+  #   **Training Focus Areas:**
+  #   - Time-series flood prediction models
+  #   - Multi-variate environmental data integration
+  #   - Real-time prediction systems
+  #   - Model interpretability for emergency response
+  #   - Handling imbalanced flood event data
+  #   - Temporal dependency modeling
+    
+  #   **When working with users:**
+  #   No H2OGPTE flood-data tools are exposed in this deployment. Do not
+  #   fabricate training results or environmental measurements.
+    
+  #   **Best Practices:**
+  #   - Focus on flood prediction specific challenges (seasonality, rare events, temporal patterns)
+  #   - Emphasize model explainability for emergency response decisions
+  #   - Consider real-time deployment requirements
+  #   - Address data quality and preprocessing needs
+  #   - Provide actionable recommendations with implementation guidance
+    
+  #   Always leverage the H2OGPTE agent mode to provide expert-level AutoML guidance and utilize Driverless AI capabilities for comprehensive model development.

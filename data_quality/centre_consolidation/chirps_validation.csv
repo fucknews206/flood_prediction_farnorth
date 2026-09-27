@@ -1,0 +1,2 @@
+rows,date_min,date_max,unique_source_indices,unique_name_coordinate_date,note
+718443,2010-01-01,2025-12-30,718443,718443,Distinct localities sharing the name Ayéné are retained using coordinate-aware identity.

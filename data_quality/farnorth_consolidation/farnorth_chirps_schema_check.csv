@@ -1,0 +1,3 @@
+file,size_bytes,columns,rainfall_columns
+CHIRPS-datasets/far-north/CHIRPS_FarNorth_fixed_2015_2019.csv,1400979008,system:index;admin_level;date;first;lat;lon;name;osm_source_note;region;source;.geo,first
+CHIRPS-datasets/far-north/CHIRPS_FarNorth_fixed_2020_2025.csv,1683602145,system:index;admin_level;date;first;lat;lon;name;osm_source_note;region;source;.geo,first

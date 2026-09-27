@@ -1,0 +1,13 @@
+fastapi==0.115.14
+h2ogpte==1.6.63
+openai==1.107.1
+pydantic-settings==2.10.1
+rq==2.1.0
+structlog==23.2.0
+uvicorn[standard]==0.32.1
+pyjwt==2.10.1
+pillow>=10.0.0
+nvidia-nat>=1.8.0
+nvidia-nat-langchain>=1.8.0
+nvidia-nat-mcp>=1.8.0
+mcp-server-time~=2025.8

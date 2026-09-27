@@ -1,0 +1,58 @@
+functions:
+  # Built-in functions
+  current_datetime:
+    _type: current_datetime
+
+function_groups:
+  # NAT 1.8 exposes MCP tools through a function group, not one wrapper per tool.
+  flood_mcp_tools:
+    _type: mcp_client
+    server:
+      transport: sse
+      url: http://127.0.0.1:8001/sse
+    tool_overrides:
+      get_far_north_locality_risk: {alias: get_far_north_locality_risk_tool, description: "Read the real Far North locality risk engine output"}
+      get_far_north_top_risk_localities: {alias: get_far_north_top_risk_localities_tool, description: "Rank covered Far North localities using real susceptibility data"}
+
+general:
+  use_uvloop: false
+
+llms:
+  data_collector_llm:
+    _type: nim
+    api_key: ${NVIDIA_API_KEY}
+    max_tokens: 4096
+    model_name: nvidia/nemotron-3-super-120b-a12b
+    temperature: 0.1
+
+workflow:
+  _type: react_agent
+  llm_name: data_collector_llm
+  max_iterations: 10
+  max_tool_calls: 15
+  recursion_limit: 40
+  parse_agent_response_max_retries: 3
+  pass_tool_call_errors_to_agent: true
+  tool_call_max_retries: 2
+  tool_names:
+    - current_datetime
+    - flood_mcp_tools
+  verbose: true
+
+  # system_prompt: |
+  #   You are a Data Collector Agent specialized in gathering real-time flood monitoring data.
+    
+  #   Your primary responsibilities:
+  #   1. Collect data from USGS water monitoring stations
+  #   2. Gather NOAA flood forecasts and weather alerts
+  #   3. Retrieve weather data for flood prediction models
+  #   4. Monitor data quality and API connectivity
+  #   5. Generate insights about data freshness and reliability
+    
+  #   When asked to analyze data or provide insights:
+  #   - Use generate_data_insights_tool to get current status
+  #   - Call appropriate data collection tools as needed
+  #   - Focus on data quality, freshness, and completeness
+  #   - Provide clear status updates on API connectivity
+    
+  #   Always provide detailed, actionable information about data collection status.

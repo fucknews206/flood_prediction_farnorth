@@ -1,0 +1,10 @@
+event_id,event_date,event_end_date,region,division,locality,latitude,longitude,severity,confidence,source
+FLD-CMR-2019-001,2019-09,2019-11,Far North,Logone-et-Chari,,,,,MEDIUM,"Cameroon humanitarian bulletin, OCHA (September–November 2019)"
+FLD-CMR-2020-001,2020-07,,Far North,Logone-et-Chari,Kousseri,,,,MEDIUM,"OCHA humanitarian report, updated 7 January 2021"
+FLD-CMR-2022-001,2022-08,2022-11,Far North,Mayo-Danay; Logone-et-Chari; Mayo-Tsanaga,,,,,HIGH,"OCHA Far North flood information notes, August–November 2022"
+FLD-CMR-2024-001,2024-07,2024-09,Far North,Mayo-Danay; Logone-et-Chari,Kousseri area,,,,HIGH,"OCHA, Cameroon: Far North flood overview, 18 October 2024"
+FLD-CMR-2023-001,2023-11,,Far North,Logone-et-Chari,Blangoua,,,,MEDIUM,"OCHA Far North situation report, November 2023"
+FLD-CMR-2023-002,2023-07,,South-West,Fako,Limbe,,,,MEDIUM,"Cameroon North-West/South-West situation report, August 2023"
+FLD-CMR-2022-002,2022-08,2022-09,South-West,Fako,,,,,MEDIUM,"OCHA Cameroon situation report, 1 November 2022"
+FLD-CMR-2021-001,2021-07,,Far North,Mayo-Sava,Seradoumda,,,,MEDIUM,"OCHA Cameroon Humanitarian Bulletin No. 23, August 2021; OCHA situation report, 7 October 2021"
+FLD-CMR-2017-001,2017-09,,Far North,Logone-et-Chari,Zina subdivision,,,,MEDIUM,"OCHA Cameroon Humanitarian Bulletin No. 4, September 2017"

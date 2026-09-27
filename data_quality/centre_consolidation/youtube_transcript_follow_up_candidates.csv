@@ -1,0 +1,408 @@
+source_file,source_kind,source_unit,matched_term_type,matched_term,flood_terms,date_text_in_context,source_date,event_date_or_window,provisional_status,duplicate_group,evidence_excerpt,source_url,verification_status,verification_reason,verified_event_date,verified_locality,canonical_event_id,channel_name,video_title,upload_date,transcript_follow_up_required
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 6,centre_locality_or_division,Yaoundé,inondations,2012-09-23T05:38:03.000Z,2012-09-23,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: videos inondations à Yaoundé quartier des etudiants de l'Université de Yaoundé 1
+CHANNEL: la terre56
+UPLOAD_DATE: 2012-09-23T05:38:03.000Z
+DESCRIPTION:  ",https://www.youtube.com/watch?v=0oMezDzUtMA,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,la terre56,videos inondations à Yaoundé quartier des etudiants de l'Université de Yaoundé 1,2012-09-23,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 11,centre_locality_or_division,YAOUNDÉ; yaoundé,INONDATIONS,2025-06-18T05:55:28.000Z,2025-06-18,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: YAOUNDÉ 7ÈME : LES POPULATIONS FACE AU CALVAIRE DES INONDATIONS
+CHANNEL: INFOS 237 NEWS
+UPLOAD_DATE: 2025-06-18T05:55:28.000Z
+DESCRIPTION: #infotv #parfaitayissi #blériotnyemeck #jeanjacquesze #stéphanembarga #espaceminé #libreexpression #lesamazones #legrandsoir #huruafrica  #martinezzogo #afrique #cameroun #yaoundé #politique #paulbiya #samueletoo #etoofils #football #fifa #caf #fecafoot #actu #actualité #débat
+
+🔔Abonnez-vous à notre chaîne sur YouTube : https://www.youtube.com/@infos237news4
+🔴Rejoignez-nous sur Facebook : https://www.facebook.com/infos237news",https://www.youtube.com/watch?v=wUcG0LE_Wis,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ; yaoundé,NONE,INFOS 237 NEWS,YAOUNDÉ 7ÈME : LES POPULATIONS FACE AU CALVAIRE DES INONDATIONS,2025-06-18,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 12,centre_locality_or_division,YAOUNDÉ; yaoundé,inondations,2023-03-21T21:54:35.000Z,2023-03-21,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: YAOUNDÉ DANS LES EAUX
+CHANNEL: INFOS 237 NEWS
+UPLOAD_DATE: 2023-03-21T21:54:35.000Z
+DESCRIPTION: #yaoundé #inondations",https://www.youtube.com/watch?v=CsShdJ2MlJ0,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ; yaoundé,NONE,INFOS 237 NEWS,YAOUNDÉ DANS LES EAUX,2023-03-21,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 20,centre_locality_or_division,YAOUNDE,FLOOD,2021-06-17T06:06:36.000Z,2021-06-17,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: HEAVY RAINFALL CAUSES FLOOD IN YAOUNDE 7 COUNCIL
+CHANNEL: Subiru Madina
+UPLOAD_DATE: 2021-06-17T06:06:36.000Z
+DESCRIPTION: HEAVY RAINFALL CAUSES FLOOD IN YAOUNDE 7 COUNCIL",https://www.youtube.com/watch?v=PjqQoPXgG70,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDE,NONE,Subiru Madina,HEAVY RAINFALL CAUSES FLOOD IN YAOUNDE 7 COUNCIL,2021-06-17,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 46,centre_locality_or_division,YAOUNDÉ; yaoundé,inondations,2023-10-06T17:55:02.000Z,2023-10-06,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: YAOUNDÉ IV : LE CARREFOUR TROPICANA DANS LES EAUX
+CHANNEL: INFOS 237 NEWS
+UPLOAD_DATE: 2023-10-06T17:55:02.000Z
+DESCRIPTION: #yaoundé #inondations 
+
+🔔Abonnez-vous à notre chaîne sur YouTube :    / @infos237news4  
+🔴Rejoignez-nous sur Facebook :   / infos237news  ",https://www.youtube.com/watch?v=eBOsS_CZ3vY,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ; yaoundé,NONE,INFOS 237 NEWS,YAOUNDÉ IV : LE CARREFOUR TROPICANA DANS LES EAUX,2023-10-06,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 67,centre_locality_or_division,Yaoundé,inondations,2017-09-28T03:49:29.000Z,2017-09-28,UNKNOWN,POSSIBLE_DUPLICATE,,"TITLE: EQUINOXE TV JT 20H00(CMR: Yaoundé sous les inondations) Mercredi 13 Septembre 2017
+CHANNEL: Joel Mckoy
+UPLOAD_DATE: 2017-09-28T03:49:29.000Z
+DESCRIPTION: nan",https://www.youtube.com/watch?v=wI_UDiCRl-I,POSSIBLE_DUPLICATE,"A 13 September 2017 Yaoundé-wide report may concern the 12 September Nkolbisson episode, but it does not name Nkolbisson; do not merge without viewing/transcript confirmation.",UNKNOWN,Yaoundé,NONE,Joel Mckoy,EQUINOXE TV JT 20H00(CMR: Yaoundé sous les inondations) Mercredi 13 Septembre 2017,2017-09-28,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 88,centre_locality_or_division,Yaoundé; ngousso,Inondation,2022-03-09T15:52:22.000Z,2022-03-09,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: Inondation à Yaoundé: le personnes contraints d'évacuer.
+CHANNEL: TELE DU TRIANGLE
+UPLOAD_DATE: 2022-03-09T15:52:22.000Z
+DESCRIPTION: Avec le retour des pluies, les riverains du quartier ngousso à Yaoundé ont les pieds dans l'eau. Et ils enregistrent d'importantes pertes matérielles.",https://www.youtube.com/watch?v=W_k1A_bQ6OI,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé; ngousso,NONE,TELE DU TRIANGLE,Inondation à Yaoundé: le personnes contraints d'évacuer.,2022-03-09,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 89,centre_locality_or_division,YAOUNDÉ; yaoundé,inondations,2023-05-18T19:34:47.000Z,2023-05-18,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: YAOUNDÉ UNE FORTE PLUIE FAIT DES RAVAGES
+CHANNEL: INFOS 237 NEWS
+UPLOAD_DATE: 2023-05-18T19:34:47.000Z
+DESCRIPTION: #yaoundé #pluies #inondations
+
+🔔 Abonnez-vous à notre chaîne sur YouTube :    / @infos237news4  
+🔴Rejoignez-nous sur Facebook :   / infos237news  ",https://www.youtube.com/watch?v=kx6hVwp60Lc,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ; yaoundé,NONE,INFOS 237 NEWS,YAOUNDÉ UNE FORTE PLUIE FAIT DES RAVAGES,2023-05-18,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 90,centre_locality_or_division,YAOUNDÉ,INONDATIONS,2022-05-17T23:00:02.000Z,2022-05-17,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: SÉRIE D'INONDATIONS A YAOUNDÉ - ÉQUINOXE TV
+CHANNEL: ÉQUINOXE TV
+UPLOAD_DATE: 2022-05-17T23:00:02.000Z
+DESCRIPTION: SÉRIE D'INONDATIONS A YAOUNDÉ - ÉQUINOXE TV",https://www.youtube.com/watch?v=7L6CsGATdpg,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ,NONE,ÉQUINOXE TV,SÉRIE D'INONDATIONS A YAOUNDÉ - ÉQUINOXE TV,2022-05-17,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 91,centre_locality_or_division,Yaoundé; YAOUNDÉ,INONDATION,2011-09-22T11:12:04.000Z,2011-09-22,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: Inondatio à Yaoundé OYOMABAN  [1].MP4
+CHANNEL: bethesdaful
+UPLOAD_DATE: 2011-09-22T11:12:04.000Z
+DESCRIPTION: INONDATION à YAOUNDÉ",https://www.youtube.com/watch?v=GL3pup4BYbc,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé; YAOUNDÉ,NONE,bethesdaful,Inondatio à Yaoundé OYOMABAN  [1].MP4,2011-09-22,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 93,centre_locality_or_division,Yaoundé,Flood,2021-06-07T18:53:20.000Z,2021-06-07,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: Automobile Toyota Car Struggles in Flood Yaoundé/Cameroon Today . Toyota  Breaking News . trending
+CHANNEL: Mr Talk Cartoon Comedy
+UPLOAD_DATE: 2021-06-07T18:53:20.000Z
+DESCRIPTION: nan",https://www.youtube.com/watch?v=iccXvIZb2EQ,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,Mr Talk Cartoon Comedy,Automobile Toyota Car Struggles in Flood Yaoundé/Cameroon Today . Toyota  Breaking News . trending,2021-06-07,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 98,centre_locality_or_division,Elig-Edzoa; Yaoundé; YAOUNDE,inondation; INONDATION,2022-04-19T17:27:36.000Z,2022-04-19,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: #TARA_ZOOM : Grave inondation au quartier Elig-Edzoa à Yaoundé 🤦‍♀️🤦‍♀️🌊🌊🌊🌊🌊🌊☔️☔️🇨🇲🇨🇲🇨🇲
+CHANNEL: TARA PLUS TV
+UPLOAD_DATE: 2022-04-19T17:27:36.000Z
+DESCRIPTION: #TARA_ZOOM #TARA #INONDATION #YAOUNDE #ELIG_EDZOA",https://www.youtube.com/watch?v=R03gLcPQhvs,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Elig-Edzoa; Yaoundé; YAOUNDE,NONE,TARA PLUS TV,#TARA_ZOOM : Grave inondation au quartier Elig-Edzoa à Yaoundé 🤦‍♀️🤦‍♀️🌊🌊🌊🌊🌊🌊☔️☔️🇨🇲🇨🇲🇨🇲,2022-04-19,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 99,centre_locality_or_division,Yaoundé,Inondation,2025-03-28T10:30:06.000Z,2025-03-28,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: Inondation au marché éssos de Yaoundé et calvaire des populations3 BIYA DEM!SSIONNE AU PALAIS
+CHANNEL: Daniel Nikon Officiel
+UPLOAD_DATE: 2025-03-28T10:30:06.000Z
+DESCRIPTION: Inondation au marché éssos de Yaoundé et calvaire des populations3 BIYA DEM!SSIONNE AU PALAIS",https://www.youtube.com/watch?v=ElX9L_6YlGg,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,Daniel Nikon Officiel,Inondation au marché éssos de Yaoundé et calvaire des populations3 BIYA DEM!SSIONNE AU PALAIS,2025-03-28,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 100,centre_locality_or_division,yaounde; yaoundé,INONDATION,2022-10-13T23:00:14.000Z,2022-10-13,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: GRAND REPORTAGE: INONDATION A MAROUA
+CHANNEL: ÉQUINOXE TV
+UPLOAD_DATE: 2022-10-13T23:00:14.000Z
+DESCRIPTION: INONDATION A MAROUA    GRAND REPORTAGE - ÉQUINOXE TV
+
+#équinoxetv
+#audelàdelimagenousrendonscompte #douala #cameroun #cameroonian #equinoxetv #équinoxetv #yaounde #team237 #CAMEROON #cameroon🇨🇲 #cameroonfood #camerooniangirl #237showbiz
+#237🇨🇲 #garoua #ngaoundere #bafoussam #bertoua #sangmelima #maroua #237 #audelàdelimagenousrendonscompte #buea #cnnafrica#bamenda #yaounde #yaoundé #bafoussam #237blogger #237bloggers",https://www.youtube.com/watch?v=Y5ZEUVziQrA,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,yaounde; yaoundé,NONE,ÉQUINOXE TV,GRAND REPORTAGE: INONDATION A MAROUA,2022-10-13,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 106,centre_locality_or_division,YAOUNDÉ,INONDATIONS,2024-04-05T13:10:07.000Z,2024-04-05,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: INONDATIONS ET EMBOUTEILLAGES MONSTRUEUX A YAOUNDÉ - ÉQUINOXE TV
+CHANNEL: ÉQUINOXE TV
+UPLOAD_DATE: 2024-04-05T13:10:07.000Z
+DESCRIPTION: INONDATIONS ET EMBOUTEILLAGES MONSTRUEUX A YAOUNDÉ - ÉQUINOXE TV
+
+
+
+
+
+
+
+#équinoxetv 
+#audelàdelimagenousrendonscompte
+
+Follow us on
+Facebook : https://www.facebook.com/equinoxe.television
+Twitter : https://twitter.com/EquinoxeTv_cm
+Instagram :https://www.instagram.com/equinoxetvofficial/
+https://www.pinterest.com/equinoxetelevision/
+https://www.linkedin.com/in/equinoxe-television-b8b59a280/
+https://www.tiktok.com/@equinoxetelevision",https://www.youtube.com/watch?v=MG1Wvfyg4vw,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ,NONE,ÉQUINOXE TV,INONDATIONS ET EMBOUTEILLAGES MONSTRUEUX A YAOUNDÉ - ÉQUINOXE TV,2024-04-05,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 109,centre_locality_or_division,Yaoundé; yaoundé,inondation; inondations,2026-06-07T17:00:34.000Z,2026-06-07,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: LE CAMEROUN 🇨🇲 peut-il supporter une CATASTROPHE NATURELLE ?💔
+CHANNEL: Alex Tchami
+UPLOAD_DATE: 2026-06-07T17:00:34.000Z
+DESCRIPTION: Suite à ma vidéo après l’inondation de la ville de Yaoundé (CAMEROUN), les camerounais estime que je ne devrais pas faire cette vidéo que je salis le pays.
+#honte
+#pays
+#afrique 
+#cameroun
+#cameroun 
+#yaoundé 
+#inondations 
+#catastrophenaturelle 
+#paulbiya 
+#samueletoo 
+#denigrement
+#salir",https://www.youtube.com/watch?v=Wwi53wb_Dho,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé; yaoundé,NONE,Alex Tchami,LE CAMEROUN 🇨🇲 peut-il supporter une CATASTROPHE NATURELLE ?💔,2026-06-07,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 117,centre_locality_or_division,Yaoundé,Inondations,2024-04-04T07:36:35.000Z,2024-04-04,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: Éternelles Inondations à Yaoundé
+CHANNEL: JMTV +
+UPLOAD_DATE: 2024-04-04T07:36:35.000Z
+DESCRIPTION: nan",https://www.youtube.com/watch?v=0xy02_8im9Y,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,JMTV +,Éternelles Inondations à Yaoundé,2024-04-04,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 131,centre_locality_or_division,Yaoundé,Inondation,2013-07-06T10:15:54.000Z,2013-07-06,2013-03-01,FLOOD_EVIDENCE_NEEDS_LOCATION,,"TITLE: Inondation en plein coeur de la capitale au Palais des Sport 2e Partie
+CHANNEL: Les Visages d'Afrique
+UPLOAD_DATE: 2013-07-06T10:15:54.000Z
+DESCRIPTION: Inondation à Yaoundé au Palais des Sport le 1er mars 2013 où les voitures hautes sont imobilisées dans l'eau et le piétons ne peuvent pas poursuivre leur chemin.",https://www.youtube.com/watch?v=v9k5VHZ8Efw,FLOOD_EVIDENCE_NEEDS_LOCATION,"The video text gives a specific flood date and Yaoundé locality, but that locality has no defensible project-gazetteer feature/coordinate. Held rather than assigning a made-up point.",2013-03-01,"Palais des Sports, Yaoundé",NONE,Les Visages d'Afrique,Inondation en plein coeur de la capitale au Palais des Sport 2e Partie,2013-07-06,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 133,centre_locality_or_division,YAOUNDE,INONDATIONS,2025-09-04T21:10:47.000Z,2025-09-04,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: DOUALA ET YAOUNDE SOUS LES EAUX : LES INONDATIONS RAVIVENT LES FAILLES DE LA GESTION URBAINE
+CHANNEL: SUD TV
+UPLOAD_DATE: 2025-09-04T21:10:47.000Z
+DESCRIPTION: nan",https://www.youtube.com/watch?v=2tq_gGSARr8,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDE,NONE,SUD TV,DOUALA ET YAOUNDE SOUS LES EAUX : LES INONDATIONS RAVIVENT LES FAILLES DE LA GESTION URBAINE,2025-09-04,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 136,centre_locality_or_division,ODZA; Odza,INONDATIONS,2023-10-10T21:32:40.000Z,2023-10-10,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: INONDATIONS AU QUARTIER ODZA
+CHANNEL: INFOS 237 NEWS
+UPLOAD_DATE: 2023-10-10T21:32:40.000Z
+DESCRIPTION: #Floods #Cameroon #Odza",https://www.youtube.com/watch?v=dN5RfdgE0JU,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,ODZA; Odza,NONE,INFOS 237 NEWS,INONDATIONS AU QUARTIER ODZA,2023-10-10,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 137,centre_locality_or_division,YAOUNDE,INONDATIONS,2022-07-02T03:30:06.000Z,2022-07-02,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: LA GALÈRE DES INONDATIONS A YAOUNDÉ - ÉQUINOXE TV
+CHANNEL: ÉQUINOXE TV
+UPLOAD_DATE: 2022-07-02T03:30:06.000Z
+DESCRIPTION: LA GALÈRE DES INONDATIONS A YAOUNDÉ - ÉQUINOXE TV",https://www.youtube.com/watch?v=E8rgOziA7Zg,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDE,NONE,ÉQUINOXE TV,LA GALÈRE DES INONDATIONS A YAOUNDÉ - ÉQUINOXE TV,2022-07-02,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 140,centre_locality_or_division,Yaoundé,INONDATION,2024-04-04T20:01:22.000Z,2024-04-04,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: INONDATION: Le centre ville de Yaoundé sous l'emprise des eaux
+CHANNEL: Canal2 International
+UPLOAD_DATE: 2024-04-04T20:01:22.000Z
+DESCRIPTION: Abonnez-vous  https://goo.gl/hc9PXq 
+Un programme de Canal 2 International.
+Jt, 04/04/2024
+Découvrez nos playlists 
+( ( ( ( Cliquez sur tous les liens ) ) ) 
+
+INFO
+https://urlz.fr/fWJ8
+https://goo.gl/GHBAJC
+https://goo.gl/mRKRAU
+https://goo.gl/XwdAEv
+https://goo.gl/nrpUxb
+https://goo.gl/bcme2M
+https://goo.gl/tajemz 
+https://goo.gl/9krKHR
+https://goo.gl/DWQ3hb
+https://goo.gl/93uJMH
+https://goo.gl/EFs284
+https://goo.gl/hVisc7
+https://goo.gl/jxLVYM
+https://goo.gl/tHCXDJ
+
+DIVERTISSEMENT & SOCIETE
+https://goo.gl/Hs8Rhu 
+https://goo.gl/YDVPFk
+https://goo.gl/B5Vrv4
+https://goo.gl/7dPBSY
+https://goo.gl/ciGK7P
+https://goo.gl/eKoenX
+https://goo.gl/WtZt7N 
+https://goo.gl/jzns4k 
+
+
+Toujours plus près de vous ... aussi sur les réseaux sociaux :
+Twitter : @canal2inter
+Facebook :   / canal2international  
+Skype : Canal2 skype
+Whatsapp : +237 652 551 091",https://www.youtube.com/watch?v=tefSEdbwvLI,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,Canal2 International,INONDATION: Le centre ville de Yaoundé sous l'emprise des eaux,2024-04-04,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 141,centre_locality_or_division,NKOLBISSON; YAOUNDE,INONDATION,2024-11-05T09:23:28.000Z,2024-11-05,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: INONDATION A NKOLBISSON YAOUNDE
+CHANNEL: Zoroman Officiel
+UPLOAD_DATE: 2024-11-05T09:23:28.000Z
+DESCRIPTION: nan",https://www.youtube.com/watch?v=QY0d3X7Dzvs,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,NKOLBISSON; YAOUNDE,NONE,Zoroman Officiel,INONDATION A NKOLBISSON YAOUNDE,2024-11-05,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 142,centre_locality_or_division,YAOUNDÉ,INONDATIONS,2024-07-04T15:30:10.000Z,2024-07-04,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: INONDATIONS DANS LA VILLE DE YAOUNDÉ - EQUINOXE TV
+CHANNEL: ÉQUINOXE TV
+UPLOAD_DATE: 2024-07-04T15:30:10.000Z
+DESCRIPTION: INONDATIONS DANS LA VILLE DE YAOUNDÉ - EQUINOXE TV
+
+
+
+
+
+
+#équinoxetv
+#audelàdelimagenousrendonscompte
+
+
+
+
+
+
+
+
+Follow us on
+Facebook : https://www.facebook.com/equinoxe.television
+Twitter : https://twitter.com/EquinoxeTv_cm
+Instagram :https://www.instagram.com/equinoxetvofficial/
+https://www.pinterest.com/equinoxetelevision/
+https://www.linkedin.com/in/equinoxe-television-b8b59a280/
+https://www.tiktok.com/@equinoxetelevision",https://www.youtube.com/watch?v=NgIPuijenII,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ,NONE,ÉQUINOXE TV,INONDATIONS DANS LA VILLE DE YAOUNDÉ - EQUINOXE TV,2024-07-04,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 147,centre_locality_or_division,YAOUNDÉ,INONDATIONS,2026-06-05T20:54:14.000Z,2026-06-05,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: INONDATIONS, YAOUNDÉ SOUS LES EAUX
+CHANNEL: Info TV Officiel 
+UPLOAD_DATE: 2026-06-05T20:54:14.000Z
+DESCRIPTION: nan",https://www.youtube.com/watch?v=NDDFgAKdJ7w,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ,NONE,Info TV Officiel ,"INONDATIONS, YAOUNDÉ SOUS LES EAUX",2026-06-05,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 159,centre_locality_or_division,Yaoundé; poste centrale; Kennedy; kennedy,inondation,2022-07-02T12:33:14.000Z,2022-07-02,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: Yaoundé noyée dans les eaux
+CHANNEL: NAJA TV
+UPLOAD_DATE: 2022-07-02T12:33:14.000Z
+DESCRIPTION: La poste centrale et l'avenue Kennedy sont devenus des lacs à ciel ouvert, en cas de fortes pluies. Les dégâts sont énormes et à chaque inondation, c'est le sauve qui peut.
+
+#Yaoundé #Cameroun #Avenue_kennedy",https://www.youtube.com/watch?v=Z-vNyDDwsug,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé; poste centrale; Kennedy; kennedy,NONE,NAJA TV,Yaoundé noyée dans les eaux,2022-07-02,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 162,centre_locality_or_division,YAOUNDÉ; yaoundé,inondations,2023-04-07T16:16:47.000Z,2023-04-07,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: YAOUNDÉ : UNE MINI CITÉ DANS LES EAUX
+CHANNEL: INFOS 237 NEWS
+UPLOAD_DATE: 2023-04-07T16:16:47.000Z
+DESCRIPTION: #yaoundé #inondations 
+
+🔔 Abonnez-vous à notre chaîne sur YouTube :    / @infos237news4  
+🔴Rejoignez-nous sur Facebook :   / infos237news  ",https://www.youtube.com/watch?v=7QDZJ0XxtW8,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ; yaoundé,NONE,INFOS 237 NEWS,YAOUNDÉ : UNE MINI CITÉ DANS LES EAUX,2023-04-07,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 164,centre_locality_or_division,YAOUNDÉ; Yaoundé; yaoundé,inondations,2026-06-06T17:00:21.000Z,2026-06-06,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: La capitale politique du CAMEROUN 🇨🇲: YAOUNDÉ engloutis sous l’eau.
+CHANNEL: Alex Tchami
+UPLOAD_DATE: 2026-06-06T17:00:21.000Z
+DESCRIPTION: Plus le temps passe plus la capitale politique du Cameroun 🇨🇲 (Yaoundé) est en danger ⚠️ avec des inondations qui persistent chaque jour.
+#inondations 
+#catastrophenaturelle 
+#cameroun 
+#yaoundé 
+#eau
+#afrique 
+#activitehumaine
+#paulbiya 
+#mort
+#pauvreté 
+#promiscuity",https://www.youtube.com/watch?v=NcHdQexGWYg,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ; Yaoundé; yaoundé,NONE,Alex Tchami,La capitale politique du CAMEROUN 🇨🇲: YAOUNDÉ engloutis sous l’eau.,2026-06-06,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 165,centre_locality_or_division,Yaoundé,Inondations,2026-06-06T12:16:17.000Z,2026-06-06,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: Inondations: Yaoundé sous les Eaux
+CHANNEL: Luther Junior SANA
+UPLOAD_DATE: 2026-06-06T12:16:17.000Z
+DESCRIPTION: nan",https://www.youtube.com/watch?v=JDyaqPZG56k,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,Luther Junior SANA,Inondations: Yaoundé sous les Eaux,2026-06-06,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 168,centre_locality_or_division,Yaoundé,Inondations,2019-09-20T20:09:24.000Z,2019-09-20,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: Inondations a Yaoundé-beyem assi
+CHANNEL: Lyrics best song
+UPLOAD_DATE: 2019-09-20T20:09:24.000Z
+DESCRIPTION: nan",https://www.youtube.com/watch?v=V1EwtgeKhFY,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,Lyrics best song,Inondations a Yaoundé-beyem assi,2019-09-20,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 179,centre_locality_or_division,Yaoundé,flood,2026-05-09T03:42:47.000Z,2026-05-09,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: SOLMA - Mewoulou Call To Action @Solmafoundation @UNDP @prctvcameroun  @crtvwebtv @rescueorg
+CHANNEL: Solmafoundation
+UPLOAD_DATE: 2026-05-09T03:42:47.000Z
+DESCRIPTION: SOLMA | MEWOULOU CALL TO ACTION
+
+A community in motion, a challenge in silt. Witness the daily reality of Mewoulou, Yaoundé, and join the SOLMA Foundation in building a safer, more resilient future.
+
+THE MISSION
+This isn't just about mud and water. It's about the resilience of a neighborhood navigating a critical lack of infrastructure. Every flood represents a stalled commute, a risk to children, and a barrier to local economic growth.
+
+The SOLMA Foundation is officially launching this Call to Action to fund and facilitate the Mewoulou Bridge Project (SOLMA-2026-BRG). Our goal is to move past the digital witness phase and into physical construction.
+
+PROJECT DETAILS
+
+Location: Mewoulou, Yaoundé, Cameroon
+
+Sector: Centre des Handicapés
+
+Project ID: SOLMA-2026-BRG
+
+Mission: Infrastructure improvement, waste management, and bridge construction.
+
+HOW TO SUPPORT
+Join us in bridging the gap. Every share and every contribution moves us one step closer to dry land and safe passage.
+
+Website: www.solmafoundation.org
+Email: support@solmafoundation.org
+
+#SolmaFoundation #Mewoulou #Yaoundé #Infrastructure #BridgeTheGap #SocialImpact #Cameroon",https://www.youtube.com/watch?v=4s9ZxVcjVD4,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,Solmafoundation,SOLMA - Mewoulou Call To Action @Solmafoundation @UNDP @prctvcameroun  @crtvwebtv @rescueorg,2026-05-09,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 194,centre_locality_or_division,ESSOS; YAOUNDÉ,INONDATIONS,2025-04-23T21:26:56.000Z,2025-04-23,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: 🆘 ÉLECTION PRÉSIDENTIELLE : LES POUBELLES ET LES INONDATIONS AU MARCHÉ ESSOS À YAOUNDÉ
+CHANNEL: Christ News Tv
+UPLOAD_DATE: 2025-04-23T21:26:56.000Z
+DESCRIPTION: #mauricekamto #paulbiya",https://www.youtube.com/watch?v=CELsog7q8Jc,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,ESSOS; YAOUNDÉ,NONE,Christ News Tv,🆘 ÉLECTION PRÉSIDENTIELLE : LES POUBELLES ET LES INONDATIONS AU MARCHÉ ESSOS À YAOUNDÉ,2025-04-23,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 197,centre_locality_or_division,Yaounde; poste centrale; Yaoundé,Inondation,2019-03-07T11:47:10.000Z,2019-03-07,2019-03-07,FLOOD_EVIDENCE_NEEDS_LOCATION,,"TITLE: Yaounde - Inondation a la poste centrale
+CHANNEL: un camerounais
+UPLOAD_DATE: 2019-03-07T11:47:10.000Z
+DESCRIPTION: Yaoundé
+07/03/2019
+
+Bienvenu au centre-ville de la capitale politique du Cameroun du roi Paul Biya et ses frères du village.
+Les biyamerounais zombifié te diront qu’a New York, Paris, etc. il y’a aussi ce genre de chose donc c’est normal.
+La honte.",https://www.youtube.com/watch?v=6qmC3iNyMVo,FLOOD_EVIDENCE_NEEDS_LOCATION,"The video text gives a specific flood date and Yaoundé locality, but that locality has no defensible project-gazetteer feature/coordinate. Held rather than assigning a made-up point.",2019-03-07,"Poste Centrale, Yaoundé",NONE,un camerounais,Yaounde - Inondation a la poste centrale,2019-03-07,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 205,centre_locality_or_division,MIMBOMAN; yaoundé,inondations,2023-10-06T17:53:08.000Z,2023-10-06,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: MIMBOMAN PLATEAU : LES HABITANTS, LES PIEDS DANS L'EAU
+CHANNEL: INFOS 237 NEWS
+UPLOAD_DATE: 2023-10-06T17:53:08.000Z
+DESCRIPTION: #yaoundé #inondations 
+
+🔔Abonnez-vous à notre chaîne sur YouTube :    / @infos237news4  
+🔴Rejoignez-nous sur Facebook :   / infos237news  ",https://www.youtube.com/watch?v=X9jHx5e2lh4,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,MIMBOMAN; yaoundé,NONE,INFOS 237 NEWS,"MIMBOMAN PLATEAU : LES HABITANTS, LES PIEDS DANS L'EAU",2023-10-06,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 206,centre_locality_or_division,Yaoundé,inondations,2009-06-12T02:16:16.000Z,2009-06-12,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: MboaBLOG vous présente Yaoundé en saison pluvieuse
+CHANNEL: MboaBLOG Os
+UPLOAD_DATE: 2009-06-12T02:16:16.000Z
+DESCRIPTION: Un jeune parle des inondations",https://www.youtube.com/watch?v=vbvNRZqopnw,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,MboaBLOG Os,MboaBLOG vous présente Yaoundé en saison pluvieuse,2009-06-12,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 209,centre_locality_or_division,Yaoundé,inondations,2024-07-31T14:24:30.000Z,2024-07-31,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: July 31, 2024
+CHANNEL: elisee Yonta
+UPLOAD_DATE: 2024-07-31T14:24:30.000Z
+DESCRIPTION: Bonjour les amis, 
+
+Je partage cette vidéo des inondations dans la ville de Yaoundé au Cameroun. 
+
+Ce qui se passe au Cameroun, se passe aussi dans les autres pays africains avec l urbanisation non contrôlée. 
+
+N'est ce pas temps de poser le problème de l urbanisation, de l évacuation des eaux et de l habitat regulee et contrôlée selon un plan d urbanisation ?
+
+Cordialement. 
+
+#eliseeyonta",https://www.youtube.com/watch?v=K74hZ6oMEas,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,elisee Yonta,"July 31, 2024",2024-07-31,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 215,centre_locality_or_division,Yaoundé; Mfoundi,Flooding,2023-10-10T02:21:29.000Z,2023-10-10,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: The Flooding in Yaoundé, Mfoundi, Cameroon/Cameroun   glissement de terrain meurtrier à Yaoundé
+CHANNEL: Slava Rachelle
+UPLOAD_DATE: 2023-10-10T02:21:29.000Z
+DESCRIPTION: @viralreels @reels2023 @realtalkreels @Godisgood @GloryToGod @jesuschrist @reelsvideo @reelsfb @reelsviral @sound @fyp @followformore @viral @christian @shorts @share @Repost @trending @trend @capcut @fuel @fulltank @kings @seo @CNN @BBC @BBCHindi @CNN",https://www.youtube.com/watch?v=i5IM9K1aXHk,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé; Mfoundi,NONE,Slava Rachelle,"The Flooding in Yaoundé, Mfoundi, Cameroon/Cameroun   glissement de terrain meurtrier à Yaoundé",2023-10-10,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 218,centre_locality_or_division,Yaoundé,Inondation; inondations,2020-06-16T07:54:39.000Z,2020-06-16,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: Cameroun Inondation Yaoundé
+CHANNEL: CAMER TV
+UPLOAD_DATE: 2020-06-16T07:54:39.000Z
+DESCRIPTION: les inondations ne sont pas finies dans la capitale",https://www.youtube.com/watch?v=fGO5m-gqoqI,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,CAMER TV,Cameroun Inondation Yaoundé,2020-06-16,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 219,centre_locality_or_division,Yaounde,Inondations,2017-05-09T06:11:22.000Z,2017-05-09,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: Cameroun Yaoundé Inondations / Cameroon Yaounde Floods
+CHANNEL: Hors Frontières 
+UPLOAD_DATE: 2017-05-09T06:11:22.000Z
+DESCRIPTION: Près de 5000 vidéos en HD. Sur 140 pays différents.
+Abonnez-vous si vous aimez la vidéo !
+Subscribe and like ! 
+
+Facebook :  http://www.facebook.com/Hors-frontier... 
+Site Internet : http://hors-frontieres.fr
+
+Mon tour du monde continue. Déjà plus de 160 pays visités. Et comme toujours, voici les vidéos complètes de cette formidable aventure humaine.
+
+Si vous aimez mon travail, abonnez-vous à ma chaîne. Vous serez ainsi les premiers informés des nouvelles publications.
+
+--------------------------------------------------------------------------------------------------------------
+
+My world tour continues . Already more than 160 countries visited. And as always, here is the full video of this great human adventure .
+
+If you like my work , please subscribe to my channel. You'll be the first informed about new publications.",https://www.youtube.com/watch?v=AtmcIbLf5qg,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaounde,NONE,Hors Frontières ,Cameroun Yaoundé Inondations / Cameroon Yaounde Floods,2017-05-09,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 221,centre_locality_or_division,MFOUNDI; yaoundé; mfoundi,inondations,2022-10-01T21:43:46.000Z,2022-10-01,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: UN TAXI NOYÉ PAR LES EAUX DU MFOUNDI
+CHANNEL: INFOS 237 NEWS
+UPLOAD_DATE: 2022-10-01T21:43:46.000Z
+DESCRIPTION: #cameroun #yaoundé #pluies #inondations #mfoundi #taxinoyé",https://www.youtube.com/watch?v=mSd4QYIj9Ug,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,MFOUNDI; yaoundé; mfoundi,NONE,INFOS 237 NEWS,UN TAXI NOYÉ PAR LES EAUX DU MFOUNDI,2022-10-01,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 227,centre_locality_or_division,YAOUNDE,INONDATION; inondations,2023-03-22T09:45:32.000Z,2023-03-22,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: YAOUNDE CAPITALE POLITIQUE DU CAMEROUN DANS L'INONDATION TOTAL. MO'RADIO  fait le constat
+CHANNEL: Mo Radio 87.7
+UPLOAD_DATE: 2023-03-22T09:45:32.000Z
+DESCRIPTION: saison pluvieuse les Camerounais dans la tourmente des inondations",https://www.youtube.com/watch?v=SrVHJBtz_f4,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDE,NONE,Mo Radio 87.7,YAOUNDE CAPITALE POLITIQUE DU CAMEROUN DANS L'INONDATION TOTAL. MO'RADIO  fait le constat,2023-03-22,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 233,centre_locality_or_division,Yaoundé,inondations,2021-06-19T20:03:45.000Z,2021-06-19,UNKNOWN,POSSIBLE_DUPLICATE,,"TITLE: inondations à la mairie de Yaoundé 7 Marcellin Gansop équinoxe TV
+CHANNEL: Marcellin Gansop
+UPLOAD_DATE: 2021-06-19T20:03:45.000Z
+DESCRIPTION: reportage sur les inondations à la mairie de Yaoundé 7  Marcellin Gansop équinoxe TV",https://www.youtube.com/watch?v=YR_VWQNCeQw,POSSIBLE_DUPLICATE,"The 19 June 2021 Yaoundé VII upload may be follow-up coverage of the 7 June 2021 canonical event, but the metadata/text does not state that event date.",UNKNOWN,Yaoundé,NONE,Marcellin Gansop,inondations à la mairie de Yaoundé 7 Marcellin Gansop équinoxe TV,2021-06-19,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 257,centre_locality_or_division,YAOUNDÉ,INONDATIONS,2022-07-03T11:13:09.000Z,2022-07-03,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: LES INONDATIONS DE RETOUR À YAOUNDÉ
+CHANNEL: INFOS 237 NEWS
+UPLOAD_DATE: 2022-07-03T11:13:09.000Z
+DESCRIPTION: #YAOUNDÉ #INONDATIONS #PLUIESDILUVIENNES",https://www.youtube.com/watch?v=dHZ-R3pa_VE,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ,NONE,INFOS 237 NEWS,LES INONDATIONS DE RETOUR À YAOUNDÉ,2022-07-03,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 275,centre_locality_or_division,Yaoundé,inondations,2017-09-13T21:08:01.000Z,2017-09-13,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: EQUINOXE TV - JT 20H00(CMR: Yaoundé sous les inondations) - Mercredi 13 Septembre 2017
+CHANNEL: Kmer Replay
+UPLOAD_DATE: 2017-09-13T21:08:01.000Z
+DESCRIPTION: Présentation: Cédrick NOUFELE",https://www.youtube.com/watch?v=VVHlthGjq4k,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Yaoundé,NONE,Kmer Replay,EQUINOXE TV - JT 20H00(CMR: Yaoundé sous les inondations) - Mercredi 13 Septembre 2017,2017-09-13,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 276,centre_locality_or_division,Yaoundé; Melen,inondation; inondations,2013-07-06T19:53:06.000Z,2013-07-06,2013-03-01,FLOOD_EVIDENCE_NEEDS_LOCATION,,"TITLE: L'inondation du 1er mars 2013 au carrefour MEEC à Yaoundé
+CHANNEL: Les Visages d'Afrique
+UPLOAD_DATE: 2013-07-06T19:53:06.000Z
+DESCRIPTION: Après la pluie du 1er mars 2013, les populations du quartier Melen derrière le Parc National du Génie Civil n'ont pas dormi à cause des inondations; l'eau a envahi les dommiciles au points où non seulement les gens n'ont pas dormi, mais se sont vus obligés d'entreprendre les travaux d'investissement humain pour trouver une solution à leur problème sans attendre la Communauté Urbaine de Yaoundé qui prendrait tout son temps pour éventuellement apporter une réponse à ce problème.",https://www.youtube.com/watch?v=CRvm-VyO04U,FLOOD_EVIDENCE_NEEDS_LOCATION,"The video text gives a specific flood date and Yaoundé locality, but that locality has no defensible project-gazetteer feature/coordinate. Held rather than assigning a made-up point.",2013-03-01,"Carrefour MEEC / Melen, Yaoundé",NONE,Les Visages d'Afrique,L'inondation du 1er mars 2013 au carrefour MEEC à Yaoundé,2013-07-06,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 277,centre_locality_or_division,Mbankolo; Yaoundé,inondation,2023-10-16T06:19:55.000Z,2023-10-16,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: tremblement de terre et inondation à Mbankolo à Yaoundé
+CHANNEL:  INTERNATIONALE  UN GESTE DIVIN 
+UPLOAD_DATE: 2023-10-16T06:19:55.000Z
+DESCRIPTION: nan",https://www.youtube.com/watch?v=UlFdT809M-s,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,Mbankolo; Yaoundé,NONE, INTERNATIONALE  UN GESTE DIVIN ,tremblement de terre et inondation à Mbankolo à Yaoundé,2023-10-16,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 281,centre_locality_or_division,YAOUNDÉ; Kennedy; Emah; Mokolo,INONDATIONS,2019-09-20T20:14:09.000Z,2019-09-20,2019-09-20,FLOOD_EVIDENCE_NEEDS_LOCATION,,"TITLE: CATASTROPHE  INONDATIONS À YAOUNDÉ
+CHANNEL: Africa Circle TV
+UPLOAD_DATE: 2019-09-20T20:14:09.000Z
+DESCRIPTION: Avenue Kennedy, carrefour Emah Basile, Mokolo ont subit les foudres de la grande pluid qui s'est abattue dans la capitale politique ce vendredi 20 septembre 2019µ
+N'oubliez pas de vous abonner à notre site web pour plus d'infos.
+Vous pouvez nous suivre sur:
+- Facebook: https://www.facebook.com/Africacircletv
+- Twitter: https://twitter.com/afcir17
+- Web : https://www.africacircletv.com/ 
+©2019. #Regardez et #Partagez cette vidéo !!!!!!",https://www.youtube.com/watch?v=M1A26O3uoic,FLOOD_EVIDENCE_NEEDS_LOCATION,"The video text gives a specific flood date and Yaoundé locality, but that locality has no defensible project-gazetteer feature/coordinate. Held rather than assigning a made-up point.",2019-09-20,"Avenue Kennedy / Emah Basile, Yaoundé",NONE,Africa Circle TV,CATASTROPHE  INONDATIONS À YAOUNDÉ,2019-09-20,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 282,centre_locality_or_division,YAOUNDÉ; poste centrale; Kennedy; Yaoundé,inondations,2018-05-29T21:32:40.000Z,2018-05-29,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: YAOUNDÉ SOUS LES EAUX / À QUAND LA SOLUTION À CETTE SITUATION?
+CHANNEL: THE HAIR DOCTORS Manchester
+UPLOAD_DATE: 2018-05-29T21:32:40.000Z
+DESCRIPTION: Urgent
+
+C'EST GRAVE À YAOUNDÉ
+
+Après le passage d'une pluie torrentielle, la poste centrale, l'avenue Kennedy, l'Institut Français dans l'eau. On dirait la piscine centrale de Yaoundé. Les gens vous diront que c'est normal car même à Paris il y'a les inondations.
+
+Yaoundé respire vraiment.
+
+Paul CHOUTA (PC) le TGV de l'info",https://www.youtube.com/watch?v=zH_VjlU9vRc,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,YAOUNDÉ; poste centrale; Kennedy; Yaoundé,NONE,THE HAIR DOCTORS Manchester,YAOUNDÉ SOUS LES EAUX / À QUAND LA SOLUTION À CETTE SITUATION?,2018-05-29,YES
+scrapers-data/face and yout/dataset_youtube-scraper_2026-09-01_07-20-44-785.csv,youtube_video_metadata,row 287,centre_locality_or_division,OYOMABANG,INONDATIONS,2024-11-06T14:01:01.000Z,2024-11-06,UNKNOWN,FLOOD_EVIDENCE_NEEDS_DATE,,"TITLE: INONDATIONS À OYOMABANG: UN ÉLÈVE EMPORTÉ PAR LES EAUX - EQUINOXE TV
+CHANNEL: ÉQUINOXE TV
+UPLOAD_DATE: 2024-11-06T14:01:01.000Z
+DESCRIPTION: INONDATIONS À OYOMABANG: UN ÉLÈVE EMPORTÉ PAR LES EAUX - EQUINOXE TV
+
+
+
+
+
+
+
+#équinoxetv
+#audelàdelimagenousrendonscompte
+
+
+
+
+
+Follow us on
+Facebook : https://www.facebook.com/equinoxe.television
+Twitter : https://twitter.com/EquinoxeTv_cm
+Instagram :https://www.instagram.com/equinoxetvofficial/
+https://www.pinterest.com/equinoxetelevision/
+https://www.linkedin.com/in/equinoxe-television-b8b59a280/
+https://www.tiktok.com/@equinoxetelevision",https://www.youtube.com/watch?v=rqxnAJjEl3Q,FLOOD_EVIDENCE_NEEDS_DATE,"Flood content and a Centre locality are present, but the uploaded-at timestamp is not accepted as the event date. A transcript or the full video is needed to establish the event date/window.",UNKNOWN,OYOMABANG,NONE,ÉQUINOXE TV,INONDATIONS À OYOMABANG: UN ÉLÈVE EMPORTÉ PAR LES EAUX - EQUINOXE TV,2024-11-06,YES

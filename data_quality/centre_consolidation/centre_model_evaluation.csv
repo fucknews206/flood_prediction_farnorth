@@ -1,0 +1,2 @@
+split,train_rows,test_rows,train_positives,test_positives,decision_threshold_selected_on_train,precision,recall,f1,pr_auc,always_no_flood_pr_auc,brier_score,warning
+train < 2022-01-01; test >= 2022-01-01,23,61,2,2,0.6499999999999999,0.0,0.0,0.0,0.051250000000000004,0.03278688524590164,0.18837571953539242,"Only 4 independent positive episodes exist. Metrics are demonstrative, not deployment-valid; collect substantially more verified events before operational use."
