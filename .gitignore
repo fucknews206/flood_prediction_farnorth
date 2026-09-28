@@ -237,3 +237,29 @@ Thumbs.db
 *~
 .vscode/
 .idea/
+# Large datasets and generated data
+*.duckdb
+*.parquet
+
+# Large HydroBASINS levels excluded from Git
+core/data/geo/hybas_af_lev07_v1c.*
+core/data/geo/hybas_af_lev08_v1c.*
+core/data/geo/hybas_af_lev09_v1c.*
+core/data/geo/hybas_af_lev10_v1c.*
+core/data/geo/hybas_af_lev11_v1c.*
+core/data/geo/hybas_af_lev12_v1c.*
+
+# Large scientific/geospatial files
+*.nc
+*.tif
+*.tiff
+*.gpkg
+
+# User-uploaded media
+core/src/.data/community_report_uploads/
+
+# Local data-quality/consolidation artifacts
+data_quality/*/era5_*.parquet
+data_quality/*/*_feature_table*.parquet
+data_quality/*/*.duckdb
+
