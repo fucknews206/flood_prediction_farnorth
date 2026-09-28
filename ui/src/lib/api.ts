@@ -10,17 +10,28 @@ const API_BASE = `${BASE_URL}/api`;
 
 const getIdentityHeaders = async (): Promise<Record<string, string>> => {
     const headers: Record<string, string> = {};
+
     try {
         const user = getSession();
-        const userId = user?.user_id || user?.username || user?.email
-            ? String(user.user_id || user.username || user.email).trim()
-            : '';
-        if (userId) {
-            headers['X-User-Id'] = userId;
-            headers['X-User-Email'] = userId;
-            if (user.name) headers['X-User-Name'] = String(user.name).trim();
+
+        if (user) {
+            const userId = String(
+                user.user_id || user.username || user.email || ''
+            ).trim();
+
+            if (userId) {
+                headers['X-User-Id'] = userId;
+                headers['X-User-Email'] = userId;
+
+                if (user.name) {
+                    headers['X-User-Name'] = String(user.name).trim();
+                }
+            }
         }
-    } catch { /* ignore malformed local session */ }
+    } catch {
+        /* ignore malformed local session */
+    }
+
     return headers;
 };
 
