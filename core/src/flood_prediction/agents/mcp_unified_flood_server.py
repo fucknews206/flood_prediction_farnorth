@@ -28,7 +28,7 @@ import urllib.parse
 # The operational source of truth is the FastAPI layer, which invokes
 # farnorth_risk_engine.py in the backend process. Calling that API here avoids
 # importing the large data-science environment into the lightweight MCP venv.
-_FAR_NORTH_API = os.environ.get("FAR_NORTH_API_URL", "http://127.0.0.1:8000/api")
+_FAR_NORTH_API = os.environ.get("FAR_NORTH_API_URL", "http://localhost:8000/api")
 MAX_AGENT_TOOL_OUTPUT_CHARS = 12000
 
 

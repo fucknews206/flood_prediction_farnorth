@@ -1,304 +1,242 @@
-# 🌊 Building AI-Powered Flood Intelligence System
+# AquaGuard AI — Cameroon Flood Intelligence System
 
-Welcome! This guide will help you build and deploy an **AI-powered flood intelligence and disaster response system** using NVIDIA NIM and h2oGPTe.
+AI-powered flood risk assessment and early warning system for Cameroon's Far North region.
 
-## What You'll Build
+## Table of Contents
 
-An intelligent system that combines:
-- **Real-time flood monitoring** from USGS and NOAA data sources
-- **AI-powered risk assessment** using NVIDIA's latest language models
-- **Multi-agent coordination** with 5 specialized AI agents
-- **Predictive analytics** for flood forecasting
-- **Interactive dashboard** for monitoring and alerts
-
-By the end of this guide, you'll have a fully functional flood intelligence system running with live data.
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Environment Configuration](#environment-configuration)
+- [Database Setup](#database-setup)
+- [Frontend](#frontend)
+- [Backend](#backend)
+- [Deployment](#deployment)
+- [External APIs](#external-apis)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## What You Need
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Browser                              │
+│                   React SPA (Vite)                          │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ HTTP/JSON
+┌──────────────────────────▼──────────────────────────────────┐
+│              FastAPI Backend (Python)                       │
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────────────┐  │
+│  │ Auth Layer  │  │ Far North    │  │ AI Agents         │  │
+│  │ (OIDC/Local)│  │ Risk Engine  │  │ (NVIDIA/h2ogpte)  │  │
+│  └─────────────┘  └──────────────┘  └───────────────────┘  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+┌───────▼──────┐  ┌───────▼──────┐  ┌───────▼──────┐
+│ PostgreSQL   │  │    Redis     │  │ External APIs│
+│ + PostGIS    │  │  (RQ jobs)   │  │ Open-Meteo   │
+│              │  │              │  │ GloFAS       │
+└──────────────┘  └──────────────┘  └──────────────┘
+```
+
+## Prerequisites
 
 ### Required
-- ✅ **NVIDIA API Key** - Get your free key from [build.nvidia.com](https://build.nvidia.com)
+- **Node.js** >= 20
+- **Python** >= 3.10
+- **PostgreSQL** >= 14 with PostGIS extension
+- **Redis** >= 6 (optional — for background jobs)
 
-### Optional (Recommended)
-- 🔹 **NGC API Key** - For running a local NVIDIA NIM model (requires GPU)
-  - Get it from [NGC Catalog](https://catalog.ngc.nvidia.com/)
-  - Only needed if you have an NVIDIA GPU available
+### Optional
+- **NVIDIA API Key** — [build.nvidia.com](https://build.nvidia.com)
+- **H2OGPTE Access** — [h2o.ai](https://h2o.ai/platform/enterprise-h2ogpte/)
+- **GloFAS API Key** — [climate.copernicus.eu](https://climate.copernicus.eu/)
 
-- 🔹 **H2OGPTE Access** - For advanced AutoML features
-  - Get access at [h2o.ai](https://h2o.ai/platform/enterprise-h2ogpte/)
-  - The system works without this, but some features will be limited
+## Quick Start
 
-**Note**: If you don't have H2OGPTE or NGC keys, that's okay! The system will work with just the NVIDIA API key.
+### 1. Clone the repository
 
----
+```bash
+git clone https://github.com/your-org/aquaguard-ai.git
+cd aquaguard-ai
+```
 
-## Getting Started
+### 2. Configure environment
 
-### Step 1: Open the Notebook
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
 
-1. In your Jupyter environment, navigate to the notebook:
+### 3. Start the backend
 
-   ```
-   Building_Flood_Intelligence_Agents.ipynb
-   ```
+```bash
+cd core
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.server.txt
+uvicorn flood_prediction.server:app --reload --port 8000
+```
 
-2. Open the notebook - you'll see it's organized into clear sections
+### 4. Start the frontend
 
-3. You'll follow the notebook from top to bottom, running cells as you go
+```bash
+cd ui
+npm install
+npm run dev
+```
 
-**Important**: Read the instructions in each section before running cells!
+The frontend will be available at `http://localhost:3000`.
 
----
+## Environment Configuration
 
-## Following the Notebook
+All environment variables use the `APP_` prefix for backend settings.
 
-The notebook guides you through everything step-by-step. Here's what to expect:
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `APP_DATABASE_URL` | Yes | — | PostgreSQL connection string |
+| `APP_REDIS_URL` | No | `redis://localhost:6379` | Redis connection for background jobs |
+| `APP_NVIDIA_API_KEY` | No | — | NVIDIA AI API key |
+| `APP_H2OGPTE_URL` | No | — | H2OGPTE endpoint URL |
+| `APP_H2OGPTE_API_KEY` | No | — | H2OGPTE API key |
+| `APP_GLOFAS_API_KEY` | No | — | Copernicus GloFAS API key |
+| `APP_OIDC_AUTHORITY` | No | — | OIDC provider URL |
+| `APP_OIDC_CLIENT_ID` | No | — | OIDC client ID |
+| `APP_SECRET_KEY` | Yes (prod) | — | JWT signing secret |
+| `APP_ENV` | No | `development` | Environment: development/production/test |
+| `APP_CORS_ORIGINS` | No | `*` | Comma-separated allowed CORS origins |
 
-### 📋 Section 1: Setup
+### Frontend Variables
 
-This section sets up your environment and deploys the application.
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `VITE_API_BASE_URL` | No | `http://localhost:8000` | Backend API URL |
+| `VITE_BASE_URL` | No | `/` | Base path for deployment |
 
-**What you'll do:**
+## Database Setup
 
-1. **Install Python Dependencies** (Cell 5)
-   - Run the cell to install required libraries
-   - **⚠️ Important**: Restart your kernel after this step
-   - Don't run this cell again after restarting
+### PostgreSQL + PostGIS
 
-2. **Collect API Keys** (Cells 7-10)
-   - The notebook will prompt you to enter your API keys
-   - Your inputs are hidden for security
-   - Required: NVIDIA API Key
-   - Optional: NGC API Key, H2OGPTE credentials
-   - Just press Enter to skip optional keys
+```sql
+CREATE DATABASE flood_prediction;
+\c flood_prediction
+CREATE EXTENSION postgis;
+```
 
-3. **Generate Configuration File** (Cells 12-13)
-   - Run the cells to create your configuration
-   - The notebook shows a summary of what was configured
-   - A file called `flood_intelligence.env` is created automatically
+The application auto-creates tables on first run via SQLAlchemy `create_all`.
 
-4. **Pull Docker Images** (Cells 17-18, optionally 23-27)
-   - This downloads the application containers
-   - Takes 5-10 minutes depending on your connection
-   - You'll see progress bars
-   - Optional: If you have a GPU, you can pull the NIM LLM image (cells 23-27)
+### Migrations
 
-5. **Deploy the Application** (Cell 30 or 32)
-   - Run the docker compose command
-   - **With GPU**: Use cell 30 to deploy with local NIM LLM
-   - **Without GPU**: Use cell 32 for standard deployment
-   - Wait 2-3 minutes for services to start
+```bash
+cd core
+alembic upgrade head
+```
 
-6. **Verify Deployment** (Cell 34)
-   - Check that all containers show "healthy" status
-   - If not healthy, wait another minute and check again
+## Frontend
 
-**✅ Checkpoint**: Once all containers are healthy, your system is deployed!
+### Development
 
-### 🚀 Section 2: NVIDIA NIM Integration
+```bash
+cd ui
+npm install
+npm run dev
+```
 
-Learn how NVIDIA's language models power the flood intelligence system:
-- Test different NVIDIA models
-- See streaming responses in action
-- Compare model performance
-- Try the LLM-as-Judge evaluation feature
+### Production Build
 
-**What you'll do**: Run the cells to see AI models analyzing flood scenarios in real-time.
+```bash
+cd ui
+npm run build
+npm run preview
+```
 
-### 🧠 Section 3: h2oGPTe Agent Integration
+### Deployment
 
-Explore advanced AutoML capabilities (if you configured H2OGPTE):
-- Get AI guidance on building ML models
-- Learn feature engineering techniques
-- Understand model training best practices
+The frontend is a static SPA. Deploy `ui/dist/` to any static host:
 
-**Note**: This section is skipped if you don't have H2OGPTE credentials - that's okay!
+- **GitHub Pages**: Set `VITE_BASE_URL=/repository-name/`
+- **Netlify/Vercel**: Set `VITE_API_BASE_URL` to your backend URL
+- **S3/CloudFront**: Upload `dist/` contents
 
-### 🤝 Section 4: Multi-Agent System
+## Backend
 
-Interact with the 5 specialized AI agents:
-- **Data Collector**: Pulls real-time flood data
-- **Risk Analyzer**: Calculates flood risk scores
-- **Emergency Responder**: Manages alerts and evacuations
-- **AI Predictor**: Generates flood forecasts
-- **H2OGPTE ML Agent**: Trains and optimizes models (optional)
+### Development
 
-**What you'll do**:
-- View agent status and insights
-- Run agent workflows
-- See how agents coordinate to analyze flood risk
+```bash
+cd core
+uvicorn flood_prediction.server:app --reload --port 8000
+```
 
-### 🌐 Section 5: Real-World Data Integration
+### Production
 
-Work with live data from government agencies:
-- USGS water monitoring stations
-- NOAA flood alerts
-- Weather forecasts
+```bash
+cd core
+uvicorn flood_prediction.server:app --host 0.0.0.0 --port 8000 --workers 4
+```
 
-**What you'll do**:
-- Refresh live data from monitoring stations
-- View watershed data in tables
-- See risk scores and trends
+### Docker
 
----
+```bash
+docker build -t aquaguard-backend .
+docker run -p 8000:8000 --env-file .env aquaguard-backend
+```
 
-## Accessing Your Application
+## Deployment
 
-### Web Dashboard
+### Deployment Architecture
 
-Once deployment is complete (Section 1), you can access the interactive dashboard:
+| Component | Hosting | Notes |
+|-----------|---------|-------|
+| Frontend SPA | GitHub Pages / Netlify / S3 | Static files from `ui/dist/` |
+| Backend API | Railway / Render / AWS ECS | FastAPI + uvicorn |
+| Database | Managed PostgreSQL | Neon / Supabase / RDS |
+| Redis | Managed Redis | Upstash / ElastiCache |
 
-1. Goto the "Access" section of your deployed instance on brev.
-2. At the bottom of the page, find "Using Ports" section.
-3. If the cloud provider allows forwarding ports, there will be a clickable link similar to x.x.x.x:8090 under the "TCP/UDP Ports" section.
-2. Open that URL in your browser
-3. You'll see the Flood Intelligence Dashboard with:
-   - Real-time flood monitoring
-   - Interactive watershed maps
-   - Agent status and insights
-   - Alert management
-   - Data visualizations
+### GitHub Pages Deployment
 
----
+1. Set `VITE_BASE_URL=/your-repo-name/` in build environment
+2. Set `VITE_API_BASE_URL=https://your-backend.com`
+3. Build: `npm run build`
+4. Deploy `ui/dist/` to `gh-pages` branch
+
+### Backend Deployment (Railway/Render)
+
+1. Set all `APP_*` environment variables
+2. Set `APP_ENV=production`
+3. Set `APP_CORS_ORIGINS=https://your-frontend.com`
+4. Deploy with `uvicorn flood_prediction.server:app`
+
+## External APIs
+
+| API | Purpose | Authentication |
+|-----|---------|----------------|
+| Open-Meteo | Weather forecast | None |
+| GloFAS/Copernicus | River discharge | API key (optional) |
+| RainViewer | Radar imagery | None |
+| NASA OPERA | SAR flood imagery | None |
+| NVIDIA NIM | AI inference | API key |
+| H2OGPTE | AutoML | API key |
 
 ## Troubleshooting
 
-### Containers Not Healthy
+### Database connection failed
 
-**Problem**: After deploying, containers don't show "(healthy)" status
-
-**Solutions**:
-1. Wait 20-30 minutes - services take time to initialize
-2. Run this cell again to check status:
-   ```python
-   !docker ps -a
-   ```
-3. If still not healthy after 5 minutes, check logs:
-   ```python
-   !docker logs flood-intelligence-web
-   ```
-
-### Can't Access the Dashboard
-
-**Problem**: Port 8090 doesn't load or shows an error
-
-**Solutions**:
-1. Verify containers are running and healthy (see above)
-2. Wait 2-3 minutes after deployment
-3. Try refreshing your browser
-4. Check that the deployment step (cell 30 or 32) completed without errors
-
-### API Key Errors
-
-**Problem**: Cells show "API key required" errors
-
-**Solutions**:
-1. Make sure you ran all cells in Section 1, Step 2 (collecting keys)
-2. Verify you entered the keys correctly (check for extra spaces)
-3. Re-run the key collection cells if needed
-4. After fixing keys, restart the deployment:
-   ```python
-   !docker compose -f ../deployment/nvidia-launchable/docker-compose.yml --env-file ./flood_intelligence.env down
-   !docker compose -f ../deployment/nvidia-launchable/docker-compose.yml --env-file ./flood_intelligence.env up -d
-   ```
-
-### Out of Memory
-
-**Problem**: Containers crash or system becomes slow
-
-**Solutions**:
-1. If you deployed with local NIM (cell 30), try without it (cell 32 instead)
-2. Close other applications to free up memory
-3. Restart the containers:
-   ```python
-   !docker compose --env-file ./flood_intelligence.env restart
-   ```
-
-### Notebook Kernel Issues
-
-**Problem**: "Kernel died" or cells won't run
-
-**Solutions**:
-1. Restart the kernel from the Kernel menu
-2. Don't re-run the dependency installation (cell 5) after restarting
-3. Re-run cells from Section 1, Step 2 onwards
-
----
-
-## Next Steps
-
-Once your system is running, you can:
-
-1. **Explore the Agents** - Run the examples in Section 4 to see agents in action
-2. **Monitor Live Data** - Use Section 5 to refresh and view real-time watershed data
-3. **Customize** - Modify the prompts and queries to test different scenarios
-4. **Add More Data** - The system can monitor any watershed with USGS data
-5. **Train Models** - If you have H2OGPTE, try the AutoML features in Section 3
-
-### Learning Resources
-
-- **NVIDIA NIM**: [build.nvidia.com](https://build.nvidia.com)
-- **USGS Water Data**: [waterdata.usgs.gov](https://waterdata.usgs.gov)
-- **NOAA Flood Alerts**: [weather.gov](https://weather.gov)
-- **H2O.ai**: [h2o.ai](https://h2o.ai)
-
----
-
-## Quick Reference
-
-### Check Container Status
-```python
-!docker ps -a
-```
-All containers should show "Up" and "(healthy)"
-
-### View Logs
-```python
-!docker logs flood-intelligence-web
-!docker logs flood-intelligence-redis
+Verify `APP_DATABASE_URL` is correct and PostgreSQL is running:
+```bash
+psql $APP_DATABASE_URL -c "SELECT 1"
 ```
 
-### Restart Services
-```python
-!docker compose --env-file ./flood_intelligence.env restart
-```
+### CORS errors
 
-### Stop Services
-```python
-!docker compose --env-file ./flood_intelligence.env down
-```
+Set `APP_CORS_ORIGINS` to your frontend origin in production.
 
-### Start Services Again
-```python
-!docker compose --env-file ./flood_intelligence.env up -d
-```
+### ML model not found
 
----
+The Far North risk engine is file-backed and does not require external model files. Training artifacts in `data_quality/` are for development only.
 
-## Need Help?
+### Redis not available
 
-If you encounter issues:
-
-1. Check the Troubleshooting section above
-2. Review the error messages in failed cells
-3. Check container logs with the commands above
-4. Make sure you completed all steps in Section 1 (Setup)
-
----
-
-## About This System
-
-This flood intelligence system is built with:
-- **NVIDIA NIM** - High-performance AI inference
-- **h2oGPTe** - Enterprise AI and AutoML
-- **FastMCP** - Multi-agent coordination
-- **Real-time APIs** - USGS, NOAA, weather data
-
-It demonstrates how AI can be used for disaster response and public safety.
-
----
-
-**🌊 Ready to start?** Open the notebook and begin with Section 1!
-
-*Built with ❤️ for AI for Good using H2O.ai and NVIDIA NIM*
+The application works without Redis. Background jobs will be skipped. Set `APP_REDIS_URL` to enable them.

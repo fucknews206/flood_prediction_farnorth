@@ -9,7 +9,7 @@ function_groups:
     _type: mcp_client
     server:
       transport: sse
-      url: http://127.0.0.1:8001/sse
+      url: ${MCP_SERVER_URL:http://127.0.0.1:8001}/sse
     tool_overrides:
       get_far_north_locality_risk: {alias: get_far_north_locality_risk_tool, description: "Read the real Far North locality risk engine output"}
       get_far_north_top_risk_localities: {alias: get_far_north_top_risk_localities_tool, description: "Rank covered Far North localities using real susceptibility data"}

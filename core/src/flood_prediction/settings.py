@@ -120,7 +120,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 30
-    cors_origins: list = ["*"]
+    cors_origins: list = ["*"]  # Override via APP_CORS_ORIGINS env var in production
     allowed_hosts: list = ["*"]
 
     # =============================================================================
