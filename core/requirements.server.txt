@@ -173,9 +173,8 @@ urllib3==2.5.0
 uvicorn==0.32.1
 uvloop==0.21.0
 watchfiles==1.1.0
-# langgraph-sdk (used by NVIDIA NAT's LangChain plugin) imports
-# ``websockets.asyncio``, which was introduced after websockets 11.
-websockets>=14,<16
+# h2ogpte==1.6.63 requires websockets==11.0.3.
+# langgraph-sdk==0.2.9 does not declare a websockets dependency.
 wikipedia==1.4.0
 wrapt==1.17.3
 xxhash==3.6.0
