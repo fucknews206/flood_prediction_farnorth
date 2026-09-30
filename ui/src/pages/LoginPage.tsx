@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, ShieldCheck, Globe, Cpu, Bell, ChevronRight, Home } from 'lucide-react'
 import { setSession } from '@/lib/session'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+const API_BASE = `${API_BASE_URL}/api`
+
 type ActiveTab = 'signin' | 'register'
 
 // ─── Left Panel ───────────────────────────────────────────────────────────────
@@ -120,7 +123,11 @@ function SignInForm() {
         const identifier = email.trim()
         if (!identifier || !password) { setError('Enter a valid username and password.'); setLoading(false); return }
         try {
-            const response = await fetch('/api/auth/local-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier, password }) })
+            const response = await fetch(`${API_BASE}/auth/local-login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier, password }),
+})
             if (response.ok) {
                 const payload = await response.json()
                 setSession(payload.user)
@@ -248,7 +255,7 @@ function RegisterForm() {
         if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return }
         setLoading(true)
         try {
-            const response = await fetch('/api/auth/local-register', {
+            const response = await fetch(`${API_BASE}/auth/local-register`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: form.fullName.trim(), email: form.email.trim(), password: form.password }),
             })
