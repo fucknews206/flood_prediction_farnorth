@@ -1,5 +1,3 @@
-import { prefixURL } from './utils'
-
 export interface AppConfig {
     oidc_authority: string
     oidc_client_id: string
@@ -10,9 +8,13 @@ export interface AppConfig {
 
 let appConfig: AppConfig | null = null
 
+// Use the absolute backend URL in production so the config request reaches
+// the Render backend instead of the Vercel domain.
+const API_BASE = `${import.meta.env.VITE_API_BASE_URL || ''}/api`
+
 export const fetchConfig = async (): Promise<AppConfig> => {
     try {
-        const response = await fetch(prefixURL('api/config'))
+        const response = await fetch(`${API_BASE}/config`)
 
         if (response.ok) {
             appConfig = await response.json()

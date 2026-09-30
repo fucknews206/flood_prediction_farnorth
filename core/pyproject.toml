@@ -9,7 +9,7 @@ authors = [
     {name = "Piraveen Sivakumar", email = "piraveen.sivakumar@h2o.ai"},
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12,<3.13"
 keywords = []
 classifiers = [
     "Development Status :: 4 - Beta",

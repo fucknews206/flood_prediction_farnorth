@@ -263,3 +263,6 @@ data_quality/*/era5_*.parquet
 data_quality/*/*_feature_table*.parquet
 data_quality/*/*.duckdb
 
+.vercel
+.env*
+!.env.example

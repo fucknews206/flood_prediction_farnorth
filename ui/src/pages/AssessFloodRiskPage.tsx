@@ -495,16 +495,28 @@ export default function AssessFloodRiskPage() {
         setSpecificArea(localityName)
       }
       try {
-        // Both endpoints use live provider data.  The forecast endpoint carries
-        // the full seven-day Open-Meteo/GloFAS trajectory used in Step 3.
-        const [riskResult, forecastResult] = await Promise.all([
-          farNorthRiskApi.assess(resolvedName),
-          farNorthRiskApi.forecast(resolvedName),
-        ])
-        if (forecastResult.status === 'not_available' || !Array.isArray(forecastResult.trajectory) || !forecastResult.trajectory.length) {
-          throw new Error(forecastResult.message || 'The live forecast provider returned no forecast days.')
+        // The risk assessment is the primary result.  The forecast is
+        // supplementary — a forecast failure must not block the entire
+        // assessment when the risk engine has already produced a result.
+        const riskResult = await farNorthRiskApi.assess(resolvedName)
+        setRisk(riskResult)
+
+        // Attempt the forecast but treat it as optional.  If it fails,
+        // the risk assessment is still valid and can be displayed.
+        try {
+          const forecastResult = await farNorthRiskApi.forecast(resolvedName)
+          if (forecastResult.status === 'not_available' || !Array.isArray(forecastResult.trajectory) || !forecastResult.trajectory.length) {
+            setForecast(null)
+            setCoverageDisclosure('The live forecast is temporarily unavailable. The risk assessment is still valid.')
+          } else {
+            setForecast(forecastResult)
+          }
+        } catch {
+          setForecast(null)
+          setCoverageDisclosure('The live forecast is temporarily unavailable. The risk assessment is still valid.')
         }
-        setRisk(riskResult); setForecast(forecastResult); setDivisionResult(null)
+
+        setDivisionResult(null)
         return true
       } catch (error) {
         setRisk(null)
@@ -541,7 +553,7 @@ export default function AssessFloodRiskPage() {
     if (loadingAction) return
     setLoadingAction('review'); setLoadingError(null)
     try {
-      if (!risk || !forecast) {
+      if (!risk) {
         const ok = await withTimeout(assessSelectedLocality())
         if (!ok) throw new Error('The prediction response is not available yet. Please retry.')
         changeStep(3)
